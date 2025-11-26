@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+
+{% block title %}Galería de Tableros{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='tableros/css/dashboard.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="dashboard-header">
+    <h1><i class="fas fa-chart-line"></i> Galería de Tableros</h1>
+    <p>Selecciona un tablero para visualizar sus indicadores.</p>
+  </div>
+
+  <div class="modules-grid">
+    <!-- UCI -->
+    <a href="{{ url_for('tableros.tablero_uci') }}" class="tablero-card">
+      <div class="card-icon">
+        <i class="fas fa-procedures uci-icon"></i>
+      </div>
+      <h3>UCI</h3>
+    </a>
+    
+    <!-- Hospitalización -->
+   <a href="{{ url_for('tableros.tablero_hos') }}" class="tablero-card">
+      <div class="card-icon">
+        <i class="fas fa-hospital-user hosp-icon"></i>
+      </div>
+      <h3>Hospitalización</h3>
+    </a>
+
+    <!-- Urgencias -->
+    <a href="#" class="tablero-card">
+      <div class="card-icon">
+        <i class="fas fa-ambulance urgencias-icon"></i>
+      </div>
+      <h3>Urgencias</h3>
+    </a>
+
+    <!-- Cirugía -->
+    <a href="{{ url_for('tableros.tablero_cir') }}" class="tablero-card">
+      <div class="card-icon">
+        <i class="fas fa-user-md cirugia-icon"></i>
+      </div>
+      <h3>Cirugía</h3>
+    </a>
+  </div>
+</div>
+{% endblock %}

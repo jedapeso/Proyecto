@@ -1,0 +1,243 @@
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    padding-top: 100px; /* espacio para la barra */
+    background: #f5f7fa;
+}
+
+/* Barra superior */
+.topbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    min-height: 80px;
+    background-color: #08337B;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    z-index: 1000;
+    transition: transform 0.3s;
+}
+
+/* Botón flotante */
+.hamburger-btn {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 35px;
+    height: 30px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    cursor: pointer;
+    z-index: 1100;
+}
+
+/* Líneas del botón */
+.hamburger-btn div {
+    height: 4px;
+    border-radius: 2px;
+    transition: all 0.3s;
+}
+
+/* Color cuando barra está visible */
+.hamburger-btn.visible div {
+    background-color: white;
+}
+
+/* Color cuando barra está oculta */
+.hamburger-btn.hidden div {
+    background-color: #007BFF;
+}
+
+/* Estado abierto: cambia a X */
+.hamburger-btn.open div:nth-child(1) {
+    transform: rotate(45deg) translate(6px, 6px);
+}
+.hamburger-btn.open div:nth-child(2) {
+    opacity: 0;
+}
+.hamburger-btn.open div:nth-child(3) {
+    transform: rotate(-45deg) translate(6px, -6px);
+}
+
+/* Uniformidad entre selects y botón */
+#btnDescargarExcel {
+  height: 100%;
+  font-weight: 500;
+}
+
+#btnDescargarExcel.btn-light {
+  border: 1px solid #ced4da;
+  background-color: white;
+}
+
+#graficoCenso {
+  width: 100% !important;
+  height: 60vh !important; /* Ajusta la altura: 50-70vh según prefieras */
+}
+
+#interpretacionGrafica {
+    background-color: #f8f9fa; /* fondo suave */
+    border-left: 5px solid  #08337B; /* barra de color a la izquierda */
+    padding: 15px 20px;
+    margin-top: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    font-family: 'Arial', sans-serif;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: #333;
+}
+#interpretacionGrafica soft {
+    display: block;              /* lo convierte en bloque */
+    text-align: center;          /* centra el texto */
+    font-weight: bold;           /* lo hace más destacado */
+    font-size: 1.1rem;           /* un poco más grande */
+    margin-bottom: 10px;         /* espacio debajo */
+    color:  #08337B;           /* mismo azul de la barra lateral */
+}
+
+#interpretacionGrafica ul {
+    padding-left: 20px;
+}
+
+#interpretacionGrafica li {
+    margin-bottom: 12px;
+}
+
+#interpretacionGrafica strong.servicio {
+    color: #08337B; /* nombre del servicio */
+    font-weight: bold;
+}
+
+#interpretacionGrafica span.dato {
+    color: #555; /* color neutro para los datos */
+}
+
+.titulo-censo {
+    font-size: 32px;
+    font-weight: bold;
+    text-align: center;
+    margin: 10px 0;
+    transition: all 0.3s ease;
+}
+
+/* censo.css - estilos para la tarjeta y el chart-container */
+
+/* Mantengo tu fondo y una tipografía limpia */
+body {
+  background-color: #f8f9fa;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Tarjeta que envuelve el gráfico */
+.censo-card {
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,0.06);
+  background: #ffffff;
+  overflow: hidden;
+}
+
+/* Chart container: padre directo del canvas.
+   Ajusta la altura aquí para que censo.js la respete. */
+.chart-container {
+  position: relative;
+  width: 100%;
+  height: 500px;   /* acorde con censo.js (450/500) — ajusta si quieres más espacio */
+  background: transparent; /* el blanco lo da la card si prefieres */
+  padding: 8px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Aseguramos que el canvas ocupe todo el ancho del contenedor y mantenga alto */
+.chart-container canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Interpretación y textos dentro de la card */
+#interpretacionGrafica {
+  color: #08337B;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  margin-top: 10px; /* opcional: separa un poco del gráfico */
+}
+
+/* Ajustes responsivos para pantallas grandes (TV / tablets) */
+@media (min-width: 1200px) {
+  .chart-container {
+    height: 600px;
+  }
+  #tituloCenso {
+    font-size: 52px; /* Se expande en pantallas grandes */
+    margin-bottom: 0.3rem;  /* un poco menos de espacio debajo */
+  }
+  #interpretacionGrafica {
+    font-size: 1rem;
+  }
+}
+/* Pequeños toques: sombra más pronunciada en pantallas grandes */
+@media (min-width: 992px) {
+  .censo-card.shadow-sm {
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+  }
+}
+
+/* Ajustar posición del contenedor principal */
+.container-fluid {
+  margin-top: -60px; /* súbelo, puedes ajustar el valor (-20, -30, -50, etc.) */
+}
+
+/* Estilo para la tarjeta del gráfico */
+.card {
+  border-radius: 15px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+}
+
+/* 🎨 Estilo del título del censo */
+#tituloCenso {
+  font-size: 40px;                   /* tamaño base */
+  font-weight: bold;                 /* Negrita */
+  color: #08337B;                    /* Azul oscuro elegante */
+  text-align: center;                /* Centrado */
+  margin-bottom: 15px;               /* Separación con la tarjeta */
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  letter-spacing: 1px;               /* Espaciado entre letras */
+  text-transform: uppercase;         /* Todo en mayúsculas */
+  transition: font-size 0.3s ease;   /* animación suave al ajustar */
+}
+
+#empresaSeleccionada.empresa-seleccionada {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;   /* altura reservada */
+  line-height: 2rem;  /* asegura que el texto no expanda más */
+  font-size: 1.5rem;
+  font-weight: 500;
+  color:  #08337B; /* Azul institucional */
+  overflow: hidden;     /* evita que expanda más si el texto es largo */
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#mensaje-placeholder {
+  font-size: 2rem;   /* 👈 Más grande que lo normal */
+  font-weight: 500;
+  color: #08337B;      /* mismo azul de la interpretación */
+  text-align: center;
+  margin-top: 30px;    /* separación desde arriba */
+}
+
+
+

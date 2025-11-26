@@ -1,0 +1,13 @@
+flask
+pandas
+sqlalchemy
+ibm_db
+ibm_db_sa
+xlsxwriter
+reportlab
+google-generativeai
+python-dotenv
+celery[redis]
+redis>=5.0.0
+openpyxl
+

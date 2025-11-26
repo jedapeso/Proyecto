@@ -1,0 +1,78 @@
+body {
+  background: #f5f7fa;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+.sidebar {
+  background: #003366;
+  color: #fff;
+  border-radius: 0 0.5rem 0.5rem 0;
+  min-height: 100vh;
+}
+
+.logo {
+  font-weight: 700;
+}
+
+.menu-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  opacity: 0.85;
+}
+
+.menu-link {
+  display: block;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.9rem;
+  color: #cfdff7;
+  border-radius: 0.3rem;
+  text-decoration: none;
+}
+
+.menu-link:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.menu-block {
+  margin-bottom: 2rem;
+}
+
+.back-link {
+  color: #cfdff7;
+  font-size: 0.85rem;
+  text-decoration: none;
+  display: block;
+}
+
+.back-link:hover {
+  text-decoration: underline;
+}
+
+.main-content {
+  background: #f5f7fa;
+}
+
+.report-card {
+  background: #fff;
+  border-radius: 0.5rem;
+  box-shadow: 0 0 20px rgba(0,0,0,0.05);
+  padding: 2rem;
+}
+
+.report-header h4 {
+  font-weight: 700;
+  margin-bottom: 0.3rem;
+}
+
+.report-header p {
+  color: #666;
+  margin-bottom: 1.5rem;
+}
+
+.btn-success {
+  font-weight: 600;
+}

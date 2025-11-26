@@ -1,0 +1,67 @@
+version: "3.9"
+
+services:
+  informix:
+    image: ibmcom/informix-developer-database:latest
+    container_name: informix
+    environment:
+      - LICENSE=accept
+      - DB_LOCALE=en_US.utf8
+      - SERVER_LOCALE=en_US.utf8
+      - INFORMIXDIR=/opt/ibm/informix
+      - INFORMIXSERVER=informix
+      - INFORMIXSQLHOSTS=/opt/ibm/informix/etc/sqlhosts
+      - INFORMIX_PASSWORD=migracion
+    ports:
+      - "9088:9088"
+      - "9089:9089"
+    restart: always
+
+  redis:
+    image: redis:7.2
+    container_name: redis
+    ports:
+      - "6379:6379"
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      retries: 5
+      timeout: 5s
+
+  flask_app:
+    build: .
+    container_name: flask_app
+    depends_on:
+      - redis
+      - informix
+    ports:
+      - "5005:5005"
+    environment:
+      - INFORMIX_SERVER=clinical_drda
+      - INFORMIX_USER=informix
+      - INFORMIX_PASSWORD=migracion
+      - INFORMIX_DATABASE=clinical
+      - INFORMIX_HOST=192.168.0.3
+      - INFORMIX_PORT=1526
+      - SECRET_KEY=${SECRET_KEY}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    volumes:
+      - .:/app
+    command: python run.py
+    restart: always
+
+  celery_worker:
+    build: .
+    container_name: celery_worker
+    depends_on:
+      - redis
+      - flask_app
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    volumes:
+      - .:/app
+    command: celery -A src.celery_worker.celery worker --loglevel=info --concurrency=4 --pool=prefork
+    restart: always

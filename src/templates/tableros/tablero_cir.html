@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Tablero de Cirugía</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tablero_cir.css') }}">
+</head>
+<body>
+    <h2>Tablero de Cirugía</h2>
+
+    <button id="insertarPacienteBtn">Insertar paciente</button>
+
+    <!-- Popup para seleccionar paciente -->
+    <div id="popupPacientes" class="popup">
+        <div class="popup-content">
+            <span class="close">&times;</span>
+            <h3>Selecciona un paciente</h3>
+            <input type="text" id="buscadorPaciente" placeholder="Buscar paciente">
+            <ul id="listaPacientes">
+                <!-- Se llenará con JS -->
+            </ul>
+        </div>
+    </div>
+
+    <table id="tablaCirugia">
+        <thead>
+            <tr>
+                <th>Identificación</th>
+                <th>Nombre</th>
+                <th>Estado</th>
+                <th>Acción</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Pacientes se agregan aquí -->
+        </tbody>
+    </table>
+
+    <script src="{{ url_for('static', filename='js/tablero_cir.js') }}"></script>
+</body>
+</html>

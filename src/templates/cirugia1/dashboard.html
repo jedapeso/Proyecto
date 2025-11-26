@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+
+{% block title %}Cirugía | Panel{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='cirugia/css/dashboard.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="row">
+    <!-- Sidebar -->
+    <aside class="col-md-3 sidebar p-4">
+      <h1 class="logo mb-4"><i class="fas fa-user-md"></i> Cirugía</h1>
+
+      <div class="menu-block">
+        <p class="menu-title"><i class="fas fa-file-alt me-2"></i>REPORTES</p>
+        <a href="#" id="opcion-programacion" class="menu-link">Programación de Turnos</a>
+      </div>
+
+      <div class="menu-block">
+        <p class="menu-title"><i class="fas fa-chart-bar me-2"></i>ESTADÍSTICAS</p>
+        <a href="#" id="opcion-estadisticas" class="menu-link">Datos Estadísticos</a>
+      </div>
+
+      <a href="{{ url_for('main.index') }}" class="back-link mt-4">
+        <i class="fas fa-arrow-left"></i> Volver al Menú Principal
+      </a>
+    </aside>
+
+    <main class="col-md-9 main-content p-5">
+      <!-- CONTENIDO VACÍO -->
+      <div id="contenido-vacio" class="report-card text-center text-muted">
+        <p>Seleccione una opción del menú para mostrar los criterios.</p>
+      </div>
+
+      <!-- ESTADÍSTICAS -->
+      <div id="contenido-estadisticas" class="report-card d-none">
+        <h4><i class="fas fa-notes-medical me-2"></i>Reporte Estadísticas Cirugía</h4>
+        <form method="POST" action="{{ url_for('cirugia.estadisticas') }}">
+          <div class="row g-3 align-items-end">
+            <div class="col-md-4">
+              <label>Fecha Inicio</label>
+              <input type="date" name="fecha_inicio" class="form-control" required>
+            </div>
+            <div class="col-md-4">
+              <label>Fecha Fin</label>
+              <input type="date" name="fecha_fin" class="form-control" required>
+            </div>
+            <div class="col-md-4">
+              <button type="submit" class="btn btn-success w-100">
+                <i class="fas fa-file-excel"></i> Descargar Excel
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <!-- Programación de Turnos -->
+        <div id="contenido-programacion" class="report-card d-none">
+        <h4><i class="fas fa-calendar-check me-2"></i>Programación de Turnos</h4>
+        <form method="POST" action="{{ url_for('cirugia.programacion_turnos_excel') }}">
+         <div class="row g-3 align-items-end">
+          <div class="col-md-4">
+        <label>Fecha Inicio</label>
+        <input type="date" name="fecha_inicio" class="form-control" required>
+         </div>
+         <div class="col-md-4">
+        <label>Fecha Fin</label>
+        <input type="date" name="fecha_fin" class="form-control" required>
+      </div>
+      <div class="col-md-4">
+        <button type="submit" class="btn btn-success w-100">
+          <i class="fas fa-file-excel"></i> Descargar Excel
+        </button>
+      </div>
+    </div>
+  </form>
+</div>
+
+    </main>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='cirugia/js/dashboard.js') }}"></script>
+{% endblock %}

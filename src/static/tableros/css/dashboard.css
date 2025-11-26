@@ -1,0 +1,47 @@
+body {
+  background-color: #f8f9fa;
+}
+
+.dashboard-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.dashboard-header h1 {
+  font-size: 2rem;
+  font-weight: 600;
+  color: #343a40;
+}
+
+.modules-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.5rem;
+}
+
+.tablero-card {
+  background: #fff;
+  border-radius: 0.75rem;
+  padding: 2rem 1rem;
+  text-align: center;
+  text-decoration: none;
+  color: #343a40;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tablero-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.card-icon {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+}
+
+/* Colores únicos SOLO para los íconos */
+.tablero-card .uci-icon { color: #dc3545; }        /* Rojo */
+.tablero-card .hosp-icon { color: #0d6efd; }       /* Azul */
+.tablero-card .urgencias-icon { color: #fd7e14; }  /* Naranja */
+.tablero-card .cirugia-icon { color: #20c997; }    /* Verde */
