@@ -30,44 +30,65 @@ button {
 .popup {
     display: none;
     position: fixed;
-    top: 0; left: 0;
+    top: 0;
+    left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0,0,0,0.3);
-    z-index: 10;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
 }
+
 .popup-content {
     background: #fff;
     padding: 20px;
-    margin: 40px auto;
-    width: 300px;
+    margin: 5% auto;
+    width: 80%;
+    max-width: 600px;
     position: relative;
-    border-radius: 6px;
+    border-radius: 8px;
+    max-height: 80vh;
+    overflow-y: auto;
 }
 
 .close {
     position: absolute;
-    top: 10px; right: 14px;
-    font-size: 22px;
+    top: 10px;
+    right: 14px;
+    font-size: 28px;
+    font-weight: bold;
     cursor: pointer;
+    color: #aaa;
+    line-height: 20px;
+}
+
+.close:hover,
+.close:focus {
+    color: #000;
 }
 
 #buscadorPaciente {
-    width: 90%;
-    padding: 5px;
-    margin-bottom: 10px;
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
 }
+
 #listaPacientes {
     list-style: none;
     padding: 0;
-    max-height: 150px;
+    margin: 0;
+    max-height: 400px;
     overflow-y: auto;
 }
+
 #listaPacientes li {
-    padding: 8px;
-    border-bottom: 1px solid #eee;
+    padding: 12px;
+    border-bottom: 1px solid #ddd;
     cursor: pointer;
+    transition: background-color 0.2s;
 }
+
 #listaPacientes li:hover {
-    background: #e0e0e0;
+    background: #f0f0f0;
 }
