@@ -1,49 +1,71 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tablero de Cirugía</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="/static/tableros/css/tablero_cir.css">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- CSS específico del tablero de Cirugía -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='tableros/css/tablero_cir.css') }}">
 </head>
-<body>
-    <div class="container mt-4">
-        <h1 class="mb-4">Tablero de Cirugía</h1>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-6">
+        <header class="mb-6">
+            <h1 class="text-2xl font-bold text-gray-800 border-b-2 border-blue-600 pb-2">
+                Tablero de Cirugía
+            </h1>
+        </header>
 
-        <button type="button" id="insertarPacienteBtn" class="btn btn-primary mb-3">
-            Insertar paciente
-        </button>
+        <div class="mb-6">
+            <button 
+                type="button" 
+                id="insertarPacienteBtn" 
+                class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded transition-colors">
+                + Insertar Paciente
+            </button>
+        </div>
 
-        <!-- Tabla principal del tablero -->
-        <table id="tablaCirugia" class="table table-striped table-bordered">
-            <thead class="table-dark">
-                <tr>
-                    <th>Identificación</th>
-                    <th>Nombre</th>
-                    <th>Estado</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                <!-- Se llena dinámicamente por JS -->
-            </tbody>
-        </table>
+        <!-- Contenedor de tarjetas horizontales -->
+        <div id="contenedorPacientes" class="space-y-3">
+            <!-- Las tarjetas se insertan aquí dinámicamente -->
+        </div>
     </div>
 
-    <!-- Popup personalizado para insertar pacientes -->
-    <div id="popupPacientes" class="popup">
-        <div class="popup-content">
-            <span class="close">&times;</span>
-            <h3 class="mb-3">Seleccionar Paciente</h3>
-            <input type="text" id="buscadorPaciente" class="form-control mb-3" placeholder="Buscar paciente...">
-            <ul id="listaPacientes">
+    <!-- Modal para insertar pacientes -->
+    <div id="popupPacientes" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl w-11/12 max-w-2xl max-h-[80vh] p-6 relative animate-fadeIn">
+            <button id="cerrarModal" class="absolute top-3 right-4 text-gray-500 hover:text-gray-800 text-2xl font-bold">
+                &times;
+            </button>
+            <h2 class="text-xl font-bold mb-4 text-gray-800">Seleccionar Paciente</h2>
+            
+            <input 
+                type="text" 
+                id="buscadorPaciente" 
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                placeholder="Buscar por identificación o nombre...">
+            
+            <ul id="listaPacientes" class="border border-gray-200 rounded-lg max-h-96 overflow-y-auto">
                 <!-- Se llena dinámicamente por JS -->
             </ul>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="/static/tableros/js/tablero_cir.js"></script>
+    <!-- Script del tablero -->
+    <script src="{{ url_for('static', filename='tableros/js/tablero_cir.js') }}"></script>
+
+    <!-- Última actualización -->
+    <div id="ultima-actualizacion"
+        class="fixed bottom-2 left-2 text-xs text-gray-600 bg-white bg-opacity-70 px-2 py-1 rounded shadow">
+        Última actualización: <span id="hora-actualizacion">--</span>
+    </div>
 </body>
 </html>

@@ -12,6 +12,7 @@ import unicodedata
 import re
 from . import tableros_bp
 
+
 # Cargar variables de entorno
 load_dotenv()
 
@@ -24,32 +25,31 @@ model = genai.GenerativeModel("gemini-2.5-flash")
 
 fecha_actual = datetime.now().strftime('%Y-%m-%d')
 
+
 @tableros_bp.route('/cirugia', methods=['GET'])
 def tablero_cir():
     """Renderiza el tablero de Cirugía"""
     return render_template('tableros/tablero_cir.html')
 
 
-#lista de pacientes
+# Lista de pacientes EN EL TABLERO (desde PACMCIR1 - la grilla)
 @tableros_bp.route('/cirugia/pacientes', methods=['GET'])
 def obtener_pacientes_cirugia():
-    """API para obtener lista de pacientes de cirugía (identificacion y nombre) en orden alfabético"""
+    """API para obtener lista de pacientes que están en el tablero (PACMCIR1)"""
     try:
         with engine.begin() as conn:
-            conn.execute(text("EXECUTE PROCEDURE SP_pacientesTabCird()"))
-            
-            # Query con alias explícitos
             result = conn.execute(text("""
-                SELECT identificacion as id, nombre
-                FROM PACCIR1
-                ORDER BY nombre ASC
+                SELECT ciride as id, cirnom as nombre, cirest as estado
+                FROM PACMCIR1
+                ORDER BY cirnom ASC
             """))
             
             pacientes = []
             for row in result.mappings().all():
                 pacientes.append({
-                    'id': row.get('id') or row.get('identificacion'),
-                    'nombre': row.get('nombre')
+                    'id': row.get('id'),
+                    'nombre': row.get('nombre'),
+                    'estado': row.get('estado')
                 })
         
         return jsonify({
@@ -66,10 +66,49 @@ def obtener_pacientes_cirugia():
             "error": str(e)
         }), 500
 
-#insertar paciente al tablero cirugía
+
+# Lista de pacientes DISPONIBLES para insertar (desde PACCIR1 - el modal)
+@tableros_bp.route('/cirugia/pacientes/disponibles', methods=['GET'])
+def obtener_pacientes_disponibles():
+    """API para obtener lista de pacientes disponibles para agregar (PACCIR1)"""
+    try:
+        with engine.begin() as conn:
+            # Ejecutar el stored procedure que llena PACCIR1
+            conn.execute(text("EXECUTE PROCEDURE SP_pacientesTabCird()"))
+            
+            # Consultar PACCIR1 (pacientes disponibles)
+            result = conn.execute(text("""
+                SELECT identificacion as id, nombre
+                FROM PACCIR1
+                ORDER BY nombre ASC
+            """))
+            
+            pacientes = []
+            for row in result.mappings().all():
+                pacientes.append({
+                    'id': row.get('id'),
+                    'nombre': row.get('nombre')
+                })
+        
+        return jsonify({
+            "success": True,
+            "total": len(pacientes),
+            "pacientes": pacientes
+        })
+    
+    except Exception as e:
+        print("❌ Error en obtener_pacientes_disponibles:")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+# Insertar paciente al tablero (desde PACCIR1 hacia PACMCIR1)
 @tableros_bp.route('/cirugia/pacientes', methods=['POST'])
 def insertar_paciente_cirugia():
-    """API para insertar paciente al tablero cirugía (solo si no existe)"""
+    """API para insertar paciente de PACCIR1 a PACMCIR1"""
     try:
         data = request.get_json()
         identificacion = data.get("identificacion")
@@ -79,17 +118,18 @@ def insertar_paciente_cirugia():
             return jsonify({"success": False, "error": "Faltan datos obligatorios"}), 400
 
         with engine.begin() as conn:
-            # Verifica si el paciente ya existe
+            # Verifica si el paciente ya existe en PACMCIR1
             result = conn.execute(text("""
-                SELECT 1 FROM PACCIR1 WHERE CIRIDE = :identificacion
+                SELECT 1 FROM PACMCIR1 WHERE ciride = :identificacion
             """), {"identificacion": identificacion})
 
             if result.first():
                 return jsonify({"success": False, "error": "El paciente ya está en el tablero"}), 409
 
-            # Inserta el paciente con estado 'P' por defecto
+            # Inserta el paciente en PACMCIR1 (estado 'P' lo pone la BD automáticamente)
             conn.execute(text("""
-                EXECUTE PROCEDURE SP_insertarPaciente(:identificacion, :nombre)
+                INSERT INTO PACMCIR1 (ciride, cirnom)
+                VALUES (:identificacion, :nombre)
             """), {
                 "identificacion": identificacion,
                 "nombre": nombre
@@ -101,10 +141,9 @@ def insertar_paciente_cirugia():
         print("❌ Error en insertar_paciente_cirugia:")
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
-    
 
-    
-#Actualizar estado (completa el endpoint PUT)
+
+# Actualizar estado en PACMCIR1
 @tableros_bp.route('/cirugia/pacientes/estado', methods=['PUT'])
 def actualizar_estado_paciente():
     try:
@@ -117,10 +156,12 @@ def actualizar_estado_paciente():
 
         with engine.begin() as conn:
             conn.execute(text("""
-                EXECUTE PROCEDURE SP_actualizarEstadoPaciente(:identificacion, :estado)
+                UPDATE PACMCIR1
+                SET cirest = :estado
+                WHERE ciride = :identificacion
             """), {
-                "identificacion": identificacion,
-                "estado": nuevo_estado
+                "estado": nuevo_estado,
+                "identificacion": identificacion
             })
 
         return jsonify({"success": True, "mensaje": "Estado actualizado correctamente"})
@@ -131,8 +172,7 @@ def actualizar_estado_paciente():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-
-#Eliminar paciente (completa el endpoint DELETE)
+# Eliminar paciente de PACMCIR1
 @tableros_bp.route('/cirugia/pacientes', methods=['DELETE'])
 def eliminar_paciente_cirugia():
     try:
@@ -144,7 +184,8 @@ def eliminar_paciente_cirugia():
 
         with engine.begin() as conn:
             conn.execute(text("""
-                EXECUTE PROCEDURE SP_eliminarPaciente(:identificacion)
+                DELETE FROM PACMCIR1
+                WHERE ciride = :identificacion
             """), {
                 "identificacion": identificacion
             })
@@ -155,35 +196,3 @@ def eliminar_paciente_cirugia():
         print("❌ Error en eliminar_paciente_cirugia:")
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
-
-    
-# Lista completa de pacientes (usado sólo en el modal, NO la grilla principal)
-@tableros_bp.route('/cirugia/pacientes/disponibles', methods=['GET'])
-def obtener_pacientes_disponibles():
-    """API para obtener lista completa de pacientes disponibles para agregar al tablero"""
-    try:
-        with engine.begin() as conn:
-            result = conn.execute(text("""
-                SELECT identificacion as id, nombre
-                FROM PACIENTES
-                ORDER BY nombre ASC
-            """))
-            pacientes = []
-            for row in result.mappings().all():
-                pacientes.append({
-                    'id': row.get('id') or row.get('identificacion'),
-                    'nombre': row.get('nombre')
-                })
-        return jsonify({
-            "success": True,
-            "total": len(pacientes),
-            "pacientes": pacientes
-        })
-    except Exception as e:
-        print("❌ Error en obtener_pacientes_disponibles:")
-        traceback.print_exc()
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
-
