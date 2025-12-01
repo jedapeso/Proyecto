@@ -3,15 +3,16 @@ from src import engine
 from sqlalchemy import text
 from datetime import datetime
 import pandas as pd
-import io
 from dotenv import load_dotenv
 import google.generativeai as genai
 import os
+import qrcode
+import io
+import base64
 import traceback
-import unicodedata
-import re
+import secrets
+import time
 from . import tableros_bp
-
 
 # Cargar variables de entorno
 load_dotenv()
@@ -25,14 +26,23 @@ model = genai.GenerativeModel("gemini-2.5-flash")
 
 fecha_actual = datetime.now().strftime('%Y-%m-%d')
 
+# Diccionario temporal para almacenar tokens (en producción usar Redis)
+tokens_validos = {}
+
+# ========== RUTAS PRINCIPALES ==========
 
 @tableros_bp.route('/cirugia', methods=['GET'])
 def tablero_cir():
     """Renderiza el tablero de Cirugía"""
     return render_template('tableros/tablero_cir.html')
 
+@tableros_bp.route('/cirugia/publico', methods=['GET'])
+def tablero_cirugia_publico():
+    """Renderiza el tablero público para acompañantes"""
+    return render_template('tableros/tablero_cir_pub.html')
 
-# Lista de pacientes EN EL TABLERO (desde PACMCIR1 - la grilla)
+# ========== API PACIENTES ==========
+
 @tableros_bp.route('/cirugia/pacientes', methods=['GET'])
 def obtener_pacientes_cirugia():
     """API para obtener lista de pacientes que están en el tablero (PACMCIR1)"""
@@ -66,17 +76,13 @@ def obtener_pacientes_cirugia():
             "error": str(e)
         }), 500
 
-
-# Lista de pacientes DISPONIBLES para insertar (desde PACCIR1 - el modal)
 @tableros_bp.route('/cirugia/pacientes/disponibles', methods=['GET'])
 def obtener_pacientes_disponibles():
     """API para obtener lista de pacientes disponibles para agregar (PACCIR1)"""
     try:
         with engine.begin() as conn:
-            # Ejecutar el stored procedure que llena PACCIR1
             conn.execute(text("EXECUTE PROCEDURE SP_pacientesTabCird()"))
             
-            # Consultar PACCIR1 (pacientes disponibles)
             result = conn.execute(text("""
                 SELECT identificacion as id, nombre
                 FROM PACCIR1
@@ -104,8 +110,6 @@ def obtener_pacientes_disponibles():
             "error": str(e)
         }), 500
 
-
-# Insertar paciente al tablero (desde PACCIR1 hacia PACMCIR1)
 @tableros_bp.route('/cirugia/pacientes', methods=['POST'])
 def insertar_paciente_cirugia():
     """API para insertar paciente de PACCIR1 a PACMCIR1"""
@@ -118,7 +122,6 @@ def insertar_paciente_cirugia():
             return jsonify({"success": False, "error": "Faltan datos obligatorios"}), 400
 
         with engine.begin() as conn:
-            # Verifica si el paciente ya existe en PACMCIR1
             result = conn.execute(text("""
                 SELECT 1 FROM PACMCIR1 WHERE ciride = :identificacion
             """), {"identificacion": identificacion})
@@ -126,7 +129,6 @@ def insertar_paciente_cirugia():
             if result.first():
                 return jsonify({"success": False, "error": "El paciente ya está en el tablero"}), 409
 
-            # Inserta el paciente en PACMCIR1 (estado 'P' lo pone la BD automáticamente)
             conn.execute(text("""
                 INSERT INTO PACMCIR1 (ciride, cirnom)
                 VALUES (:identificacion, :nombre)
@@ -142,14 +144,12 @@ def insertar_paciente_cirugia():
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
 
-
-# Actualizar estado en PACMCIR1
 @tableros_bp.route('/cirugia/pacientes/estado', methods=['PUT'])
 def actualizar_estado_paciente():
     try:
         data = request.get_json()
         identificacion = data.get("identificacion")
-        nuevo_estado = data.get("estado")  # 'P', 'Q', 'R'
+        nuevo_estado = data.get("estado")
 
         if not identificacion or not nuevo_estado:
             return jsonify({"success": False, "error": "Faltan datos obligatorios"}), 400
@@ -171,8 +171,6 @@ def actualizar_estado_paciente():
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
 
-
-# Eliminar paciente de PACMCIR1
 @tableros_bp.route('/cirugia/pacientes', methods=['DELETE'])
 def eliminar_paciente_cirugia():
     try:
@@ -195,4 +193,184 @@ def eliminar_paciente_cirugia():
     except Exception as e:
         print("❌ Error en eliminar_paciente_cirugia:")
         traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# ========== SISTEMA QR CON TOKENS ==========
+
+@tableros_bp.route('/cirugia/generar-qr/<identificacion>', methods=['GET'])
+def generar_qr_paciente(identificacion):
+    """Genera un QR con token de acceso automático"""
+    try:
+        # Generar token único y seguro
+        token = secrets.token_urlsafe(32)
+        
+        # Guardar token con timestamp (válido por 24 horas)
+        tokens_validos[token] = {
+            'identificacion': identificacion,
+            'timestamp': time.time(),
+            'expira_en': 86400  # 24 horas en segundos
+        }
+        
+        # URL de acceso con token
+        url_acceso = f"{request.host_url}tableros/cirugia/paciente/{identificacion}?token={token}"
+        
+        # Generar QR
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(url_acceso)
+        qr.make(fit=True)
+        
+        img = qr.make_image(fill_color="black", back_color="white")
+        
+        # Convertir a base64
+        buffer = io.BytesIO()
+        img.save(buffer, format='PNG')
+        img_str = base64.b64encode(buffer.getvalue()).decode()
+        
+        # Obtener últimos 4 dígitos
+        clave = identificacion[-4:]
+        
+        return jsonify({
+            "success": True,
+            "qr_image": f"data:image/png;base64,{img_str}",
+            "url": url_acceso,
+            "clave": clave,
+            "identificacion": identificacion,
+            "token": token
+        })
+    
+    except Exception as e:
+        print(f"❌ Error al generar QR: {e}")
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@tableros_bp.route('/cirugia/paciente/<identificacion>', methods=['GET'])
+def vista_paciente_personalizada(identificacion):
+    """Muestra la vista personalizada con validación automática si hay token"""
+    token = request.args.get('token')
+    tiene_token_valido = False
+    
+    # Validar token si existe
+    if token and token in tokens_validos:
+        datos_token = tokens_validos[token]
+        
+        # Verificar que no haya expirado
+        tiempo_transcurrido = time.time() - datos_token['timestamp']
+        
+        if tiempo_transcurrido < datos_token['expira_en']:
+            # Verificar que la identificación coincida
+            if datos_token['identificacion'] == identificacion:
+                tiene_token_valido = True
+        else:
+            # Token expirado, eliminar
+            del tokens_validos[token]
+    
+    return render_template(
+        'tableros/vista_paciente.html', 
+        identificacion=identificacion,
+        token=token if tiene_token_valido else None,
+        acceso_automatico=tiene_token_valido
+    )
+
+@tableros_bp.route('/cirugia/paciente/validar', methods=['POST'])
+def validar_acceso_paciente():
+    """Valida acceso por clave O por token"""
+    try:
+        data = request.get_json()
+        identificacion = data.get("identificacion")
+        clave = data.get("clave")
+        token = data.get("token")
+        
+        # Opción 1: Validar por token
+        if token and token in tokens_validos:
+            datos_token = tokens_validos[token]
+            tiempo_transcurrido = time.time() - datos_token['timestamp']
+            
+            if tiempo_transcurrido < datos_token['expira_en']:
+                if datos_token['identificacion'] == identificacion:
+                    # Token válido, obtener datos
+                    with engine.begin() as conn:
+                        result = conn.execute(text("""
+                            SELECT ciride as id, cirnom as nombre, cirest as estado
+                            FROM PACMCIR1
+                            WHERE ciride = :identificacion
+                        """), {"identificacion": identificacion})
+                        
+                        paciente = result.mappings().first()
+                        
+                        if not paciente:
+                            return jsonify({"success": False, "error": "Paciente no encontrado"}), 404
+                        
+                        return jsonify({
+                            "success": True,
+                            "paciente": {
+                                "identificacion": paciente['id'],
+                                "nombre": paciente['nombre'],
+                                "estado": paciente['estado']
+                            }
+                        })
+            else:
+                # Token expirado
+                del tokens_validos[token]
+                return jsonify({"success": False, "error": "Token expirado"}), 401
+        
+        # Opción 2: Validar por clave
+        if clave:
+            if clave != identificacion[-4:]:
+                return jsonify({"success": False, "error": "Clave incorrecta"}), 401
+            
+            with engine.begin() as conn:
+                result = conn.execute(text("""
+                    SELECT ciride as id, cirnom as nombre, cirest as estado
+                    FROM PACMCIR1
+                    WHERE ciride = :identificacion
+                """), {"identificacion": identificacion})
+                
+                paciente = result.mappings().first()
+                
+                if not paciente:
+                    return jsonify({"success": False, "error": "Paciente no encontrado"}), 404
+                
+                return jsonify({
+                    "success": True,
+                    "paciente": {
+                        "identificacion": paciente['id'],
+                        "nombre": paciente['nombre'],
+                        "estado": paciente['estado']
+                    }
+                })
+        
+        return jsonify({"success": False, "error": "Falta clave o token"}), 400
+    
+    except Exception as e:
+        print(f"❌ Error al validar acceso: {e}")
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@tableros_bp.route('/cirugia/limpiar-tokens', methods=['POST'])
+def limpiar_tokens_expirados():
+    """Limpia tokens expirados (opcional, llamar periódicamente)"""
+    try:
+        tiempo_actual = time.time()
+        tokens_eliminar = []
+        
+        for token, datos in tokens_validos.items():
+            tiempo_transcurrido = tiempo_actual - datos['timestamp']
+            if tiempo_transcurrido >= datos['expira_en']:
+                tokens_eliminar.append(token)
+        
+        for token in tokens_eliminar:
+            del tokens_validos[token]
+        
+        return jsonify({
+            "success": True,
+            "tokens_eliminados": len(tokens_eliminar),
+            "tokens_activos": len(tokens_validos)
+        })
+    
+    except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500

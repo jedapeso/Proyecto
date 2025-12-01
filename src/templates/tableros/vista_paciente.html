@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estado de Paciente - Clínica del Caribe</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='tableros/css/vista_paciente.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏥 Estado del Paciente</h1>
+        </header>
+
+        <!-- Formulario de clave (solo si NO tiene token válido) -->
+        <div id="formulario-acceso" class="formulario" style="display: {% if acceso_automatico %}none{% else %}block{% endif %};">
+            <h2>Ingrese la clave de acceso</h2>
+            <p>Últimos 4 dígitos de la identificación</p>
+            <input type="tel" id="clave" maxlength="4" placeholder="****" class="input-clave" autocomplete="off">
+            <button onclick="validarAcceso()" class="btn-validar">Acceder</button>
+            <div id="error-mensaje" class="error"></div>
+        </div>
+
+        <!-- Loader mientras carga automáticamente con token -->
+        <div id="loader" style="display: {% if acceso_automatico %}block{% else %}none{% endif %};">
+            <div class="spinner"></div>
+            <p class="loader-text">Cargando información del paciente...</p>
+        </div>
+
+        <!-- Datos del paciente -->
+        <div id="datos-paciente" class="datos-paciente" style="display: none;">
+            <div class="estado-visual" id="estadoVisual">
+                <div class="icono-estado" id="iconoEstado"></div>
+                <h2 id="nombreEstado"></h2>
+            </div>
+            <div class="info-paciente">
+                <p><strong>Identificación:</strong> <span id="pacienteID"></span></p>
+                <p><strong>Nombre:</strong> <span id="pacienteNombre"></span></p>
+            </div>
+            <p class="actualizacion">Última actualización: <span id="horaActualizacion"></span></p>
+        </div>
+    </div>
+
+    <!-- Variables desde el backend (con valores por defecto seguros) -->
+    <script>
+        const IDENTIFICACION = "{{ identificacion }}";
+        const TOKEN = "{{ token if token else '' }}";
+        const ACCESO_AUTOMATICO = {% if acceso_automatico %}true{% else %}false{% endif %};
+        
+        // Debug inmediato
+        console.log('🔍 DEBUG INICIAL:');
+        console.log('- ID:', IDENTIFICACION);
+        console.log('- Token:', TOKEN);
+        console.log('- Token length:', TOKEN.length);
+        console.log('- Acceso automático:', ACCESO_AUTOMATICO);
+        console.log('- URL actual:', window.location.href);
+    </script>
+
+    <!-- JavaScript externo -->
+    <script src="{{ url_for('static', filename='tableros/js/vista_paciente.js') }}"></script>
+</body>
+</html>
