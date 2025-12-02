@@ -64,6 +64,7 @@
         </div>
     </header>
 
+
     <!-- Contenedor principal -->
     <main class="main-content">
         <div class="tablero-grid">
@@ -74,12 +75,12 @@
                         <i class="fas fa-user-clock"></i>
                     </div>
                     <h2>Preparación</h2>
-                    <span class="contador" id="count-preparacion">0</span>
                 </div>
                 <div class="lista-pacientes" id="lista-preparacion">
                     <!-- Pacientes se cargan aquí -->
                 </div>
             </div>
+
 
             <!-- Columna Quirófano -->
             <div class="columna-estado" data-estado="quirofano">
@@ -88,12 +89,12 @@
                         <i class="fas fa-procedures"></i>
                     </div>
                     <h2>Quirófano</h2>
-                    <span class="contador" id="count-quirofano">0</span>
                 </div>
                 <div class="lista-pacientes" id="lista-quirofano">
                     <!-- Pacientes se cargan aquí -->
                 </div>
             </div>
+
 
             <!-- Columna Recuperación -->
             <div class="columna-estado" data-estado="recuperacion">
@@ -102,7 +103,6 @@
                         <i class="fas fa-bed"></i>
                     </div>
                     <h2>Recuperación</h2>
-                    <span class="contador" id="count-recuperacion">0</span>
                 </div>
                 <div class="lista-pacientes" id="lista-recuperacion">
                     <!-- Pacientes se cargan aquí -->
@@ -110,6 +110,7 @@
             </div>
         </div>
     </main>
+
 
     <!-- Footer con info de actualización -->
     <footer class="footer-info">
@@ -125,6 +126,7 @@
         </div>
     </footer>
 
+
     <!-- Modal para insertar paciente -->
     <div id="modalInsertar" class="modal">
         <div class="modal-content">
@@ -135,6 +137,7 @@
                 </button>
             </div>
 
+
             <div class="modal-body">
                 <div class="search-paciente">
                     <label>Buscar paciente programado:</label>
@@ -143,6 +146,7 @@
                         <input type="text" id="buscar-paciente-modal" placeholder="Buscar por nombre o identificación...">
                     </div>
                 </div>
+
 
                 <div class="lista-disponibles" id="lista-pacientes-disponibles">
                     <div class="loading">
@@ -153,6 +157,7 @@
             </div>
         </div>
     </div>
+
 
     <!-- Modal de confirmación de eliminación -->
     <div id="modalEliminar" class="modal">
@@ -182,6 +187,7 @@
             </div>
         </div>
     </div>
+
 
     <script src="{{ url_for('static', filename='tableros/js/tablero_cir.js') }}"></script>
 </body>
