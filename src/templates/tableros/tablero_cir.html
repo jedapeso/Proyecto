@@ -68,18 +68,18 @@
     <main class="main-content">
         <div class="tablero-grid">
             <!-- Columna Preparación -->
-            <!-- Columna Preparación -->
-<div class="columna-estado" data-estado="preparacion">
-    <div class="columna-header preparacion">
-        <div class="header-icon">
-            <i class="fas fa-user-clock"></i>
-        </div>
-        <h2>Preparación</h2>
-    </div>
-    <div class="lista-pacientes" id="lista-preparacion">
-        <!-- Pacientes se cargan aquí -->
-    </div>
-</div>
+            <div class="columna-estado" data-estado="preparacion">
+                <div class="columna-header preparacion">
+                    <div class="header-icon">
+                        <i class="fas fa-user-clock"></i>
+                    </div>
+                    <h2>Preparación</h2>
+                    <span class="contador" id="count-preparacion">0</span>
+                </div>
+                <div class="lista-pacientes" id="lista-preparacion">
+                    <!-- Pacientes se cargan aquí -->
+                </div>
+            </div>
 
             <!-- Columna Quirófano -->
             <div class="columna-estado" data-estado="quirofano">
@@ -88,6 +88,7 @@
                         <i class="fas fa-procedures"></i>
                     </div>
                     <h2>Quirófano</h2>
+                    <span class="contador" id="count-quirofano">0</span>
                 </div>
                 <div class="lista-pacientes" id="lista-quirofano">
                     <!-- Pacientes se cargan aquí -->
@@ -101,12 +102,12 @@
                         <i class="fas fa-bed"></i>
                     </div>
                     <h2>Recuperación</h2>
+                    <span class="contador" id="count-recuperacion">0</span>
                 </div>
                 <div class="lista-pacientes" id="lista-recuperacion">
                     <!-- Pacientes se cargan aquí -->
                 </div>
             </div>
-
         </div>
     </main>
 
@@ -133,7 +134,7 @@
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            
+
             <div class="modal-body">
                 <div class="search-paciente">
                     <label>Buscar paciente programado:</label>
