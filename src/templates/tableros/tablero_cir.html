@@ -1,71 +1,187 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tablero de Cirugía</title>
-
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-
-    <!-- CSS específico del tablero de Cirugía -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Cirugía - Clínica del Caribe</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='tableros/css/tablero_cir.css') }}">
 </head>
-<body class="bg-gray-100 min-h-screen">
-    <div class="container mx-auto px-4 py-6">
-        <header class="mb-6">
-            <h1 class="text-2xl font-bold text-gray-800 border-b-2 border-blue-600 pb-2">
-                Tablero de Cirugía
-            </h1>
-        </header>
-
-        <div class="mb-6">
-            <button 
-                type="button" 
-                id="insertarPacienteBtn" 
-                class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded transition-colors">
-                + Insertar Paciente
-            </button>
+<body>
+    <!-- Header mejorado -->
+    <header class="header-principal">
+        <div class="header-content">
+            <div class="logo-section">
+                <i class="fas fa-hospital-alt"></i>
+                <div class="header-text">
+                    <h1>Panel de Cirugía</h1>
+                    <p>Gestión de pacientes quirúrgicos</p>
+                </div>
+            </div>
+            
+            <div class="header-actions">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="buscar-paciente" placeholder="Buscar paciente...">
+                </div>
+                <button class="btn-primary" onclick="abrirModalInsertar()">
+                    <i class="fas fa-plus"></i>
+                    Agregar Paciente
+                </button>
+            </div>
         </div>
+        
+        <!-- Estadísticas rápidas -->
+        <div class="stats-bar">
+            <div class="stat-card preparacion">
+                <i class="fas fa-user-clock"></i>
+                <div class="stat-info">
+                    <span class="stat-number" id="stat-preparacion">0</span>
+                    <span class="stat-label">Preparación</span>
+                </div>
+            </div>
+            <div class="stat-card quirofano">
+                <i class="fas fa-procedures"></i>
+                <div class="stat-info">
+                    <span class="stat-number" id="stat-quirofano">0</span>
+                    <span class="stat-label">Quirófano</span>
+                </div>
+            </div>
+            <div class="stat-card recuperacion">
+                <i class="fas fa-bed"></i>
+                <div class="stat-info">
+                    <span class="stat-number" id="stat-recuperacion">0</span>
+                    <span class="stat-label">Recuperación</span>
+                </div>
+            </div>
+            <div class="stat-card total">
+                <i class="fas fa-users"></i>
+                <div class="stat-info">
+                    <span class="stat-number" id="stat-total">0</span>
+                    <span class="stat-label">Total</span>
+                </div>
+            </div>
+        </div>
+    </header>
 
-        <!-- Contenedor de tarjetas horizontales -->
-        <div id="contenedorPacientes" class="space-y-3">
-            <!-- Las tarjetas se insertan aquí dinámicamente -->
+    <!-- Contenedor principal -->
+    <main class="main-content">
+        <div class="tablero-grid">
+            <!-- Columna Preparación -->
+            <!-- Columna Preparación -->
+<div class="columna-estado" data-estado="preparacion">
+    <div class="columna-header preparacion">
+        <div class="header-icon">
+            <i class="fas fa-user-clock"></i>
+        </div>
+        <h2>Preparación</h2>
+    </div>
+    <div class="lista-pacientes" id="lista-preparacion">
+        <!-- Pacientes se cargan aquí -->
+    </div>
+</div>
+
+            <!-- Columna Quirófano -->
+            <div class="columna-estado" data-estado="quirofano">
+                <div class="columna-header quirofano">
+                    <div class="header-icon">
+                        <i class="fas fa-procedures"></i>
+                    </div>
+                    <h2>Quirófano</h2>
+                </div>
+                <div class="lista-pacientes" id="lista-quirofano">
+                    <!-- Pacientes se cargan aquí -->
+                </div>
+            </div>
+
+            <!-- Columna Recuperación -->
+            <div class="columna-estado" data-estado="recuperacion">
+                <div class="columna-header recuperacion">
+                    <div class="header-icon">
+                        <i class="fas fa-bed"></i>
+                    </div>
+                    <h2>Recuperación</h2>
+                </div>
+                <div class="lista-pacientes" id="lista-recuperacion">
+                    <!-- Pacientes se cargan aquí -->
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Footer con info de actualización -->
+    <footer class="footer-info">
+        <div class="footer-content">
+            <div class="update-info">
+                <i class="fas fa-sync-alt" id="icon-sync"></i>
+                <span>Última actualización: <strong id="hora-actualizacion">--:--:--</strong></span>
+            </div>
+            <div class="connection-status">
+                <span class="status-dot online"></span>
+                <span>Sistema en línea</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Modal para insertar paciente -->
+    <div id="modalInsertar" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-user-plus"></i> Agregar Paciente</h2>
+                <button class="btn-close" onclick="cerrarModalInsertar()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="search-paciente">
+                    <label>Buscar paciente programado:</label>
+                    <div class="input-icon">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="buscar-paciente-modal" placeholder="Buscar por nombre o identificación...">
+                    </div>
+                </div>
+
+                <div class="lista-disponibles" id="lista-pacientes-disponibles">
+                    <div class="loading">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>Cargando pacientes disponibles...</p>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Modal para insertar pacientes -->
-    <div id="popupPacientes" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg shadow-xl w-11/12 max-w-2xl max-h-[80vh] p-6 relative animate-fadeIn">
-            <button id="cerrarModal" class="absolute top-3 right-4 text-gray-500 hover:text-gray-800 text-2xl font-bold">
-                &times;
-            </button>
-            <h2 class="text-xl font-bold mb-4 text-gray-800">Seleccionar Paciente</h2>
+    <!-- Modal de confirmación de eliminación -->
+    <div id="modalEliminar" class="modal">
+        <div class="modal-content modal-small">
+            <div class="modal-header danger">
+                <h2><i class="fas fa-exclamation-triangle"></i> Confirmar Eliminación</h2>
+                <button class="btn-close" onclick="cerrarModalEliminar()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
             
-            <input 
-                type="text" 
-                id="buscadorPaciente" 
-                class="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                placeholder="Buscar por identificación o nombre...">
+            <div class="modal-body">
+                <p>¿Está seguro de eliminar este paciente del tablero?</p>
+                <div class="paciente-eliminar-info">
+                    <strong id="nombre-eliminar"></strong>
+                    <span id="id-eliminar"></span>
+                </div>
+            </div>
             
-            <ul id="listaPacientes" class="border border-gray-200 rounded-lg max-h-96 overflow-y-auto">
-                <!-- Se llena dinámicamente por JS -->
-            </ul>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="cerrarModalEliminar()">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button class="btn-danger" onclick="confirmarEliminar()">
+                    <i class="fas fa-trash"></i> Eliminar
+                </button>
+            </div>
         </div>
     </div>
 
-    <!-- Script del tablero -->
     <script src="{{ url_for('static', filename='tableros/js/tablero_cir.js') }}"></script>
-
-    <!-- Última actualización -->
-    <div id="ultima-actualizacion"
-        class="fixed bottom-2 left-2 text-xs text-gray-600 bg-white bg-opacity-70 px-2 py-1 rounded shadow">
-        Última actualización: <span id="hora-actualizacion">--</span>
-    </div>
 </body>
 </html>

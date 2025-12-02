@@ -1,155 +1,288 @@
-// ========== VARIABLES PRINCIPALES ==========
+// ========== VARIABLES GLOBALES ==========
 let pacientes = [];
-let pacientesTablero = [];
+let pacientesDisponibles = [];
+let identificacionEliminar = null;
+let elementoArrastrado = null;
 
-const btnInsertar = document.getElementById("insertarPacienteBtn");
-const popup = document.getElementById("popupPacientes");
-const btnCerrar = document.getElementById("cerrarModal");
-const buscador = document.getElementById("buscadorPaciente");
-const lista = document.getElementById("listaPacientes");
-const contenedor = document.getElementById("contenedorPacientes");
-const horaActualizacion = document.getElementById("hora-actualizacion");
-
-// ========== ICONOS SVG ==========
-const iconos = {
-    eliminar: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-    </svg>`
-};
-
-// ========== AUXILIARES ==========
-function estadoLetraADescripcion(letra) {
-    switch (letra) {
-        case "P": return "PREPARACION";
-        case "Q": return "CIRUGIA";
-        case "R": return "RECUPERACION";
-        default: return "PREPARACION";
-    }
-}
-
-function descripcionAEstadoLetra(descr) {
-    switch (descr) {
-        case "PREPARACION": return "P";
-        case "CIRUGIA": return "Q";
-        case "RECUPERACION": return "R";
-        default: return "P";
-    }
-}
-
-function getIconoEstado(estado) {
-    switch(estado) {
-        case "PREPARACION": return "🧘";
-        case "CIRUGIA": return "⚕️";
-        case "RECUPERACION": return "🛏️";
-        default: return "📋";
-    }
-}
-
-function actualizarHora() {
-    const ahora = new Date();
-    if (horaActualizacion) {
-        horaActualizacion.textContent = ahora.toLocaleTimeString('es-CO');
-    }
-}
-
-// ========== CARGA DESDE PACMCIR1 ==========
-function cargarPacientesTablero() {
+// ========== CARGAR PACIENTES DEL TABLERO ==========
+function cargarPacientes() {
     fetch("/tableros/cirugia/pacientes")
         .then(r => r.json())
         .then(data => {
+            console.log('📥 Pacientes recibidos:', data);
+            
             if (data.success && Array.isArray(data.pacientes)) {
-                pacientesTablero = data.pacientes.map(p => ({
-                    identificacion: p.id,
-                    nombre: p.nombre,
-                    estado: estadoLetraADescripcion(p.estado || "P")
-                }));
-                renderTarjetas();
+                pacientes = data.pacientes;
+                renderizarTablero();
+                actualizarEstadisticas(); // ← IMPORTANTE: Esta línea debe estar aquí
                 actualizarHora();
             }
         })
-        .catch(error => {
-            console.error("Error:", error);
-            pacientesTablero = [];
-            renderTarjetas();
-        });
+        .catch(err => console.error("❌ Error al cargar pacientes:", err));
 }
 
-// ========== INICIALIZACIÓN ==========
-window.addEventListener("DOMContentLoaded", function() {
-    cargarPacientesTablero();
-    actualizarHora();
-});
 
-// ========== ABRIR/CERRAR MODAL ==========
-if (btnInsertar) {
-    btnInsertar.onclick = function() {
-        popup.classList.remove("hidden");
-        fetch("/tableros/cirugia/pacientes/disponibles")
-            .then(r => r.json())
-            .then(data => {
-                if (data.success && Array.isArray(data.pacientes)) {
-                    pacientes = data.pacientes.map(p => ({
-                        identificacion: p.id,
-                        nombre: p.nombre
-                    }));
-                    mostrarPacientes("");
-                }
-            })
-            .catch(() => {
-                pacientes = [];
-                mostrarPacientes("");
-            });
+// ========== RENDERIZAR TABLERO ==========
+function renderizarTablero() {
+    const preparacion = document.getElementById("lista-preparacion");
+    const quirofano = document.getElementById("lista-quirofano");
+    const recuperacion = document.getElementById("lista-recuperacion");
+
+    preparacion.innerHTML = "";
+    quirofano.innerHTML = "";
+    recuperacion.innerHTML = "";
+
+    const porEstado = {
+        P: [],
+        Q: [],
+        R: []
     };
-}
 
-if (btnCerrar) {
-    btnCerrar.onclick = function() {
-        popup.classList.add("hidden");
-    };
-}
-
-if (popup) {
-    popup.onclick = function(e) {
-        if (e.target === popup) {
-            popup.classList.add("hidden");
+    // Agrupar pacientes por estado
+    pacientes.forEach(p => {
+        if (porEstado[p.estado]) {
+            porEstado[p.estado].push(p);
         }
-    };
+    });
+
+    // Renderizar cada columna
+    renderColumna(preparacion, porEstado.P, "P");
+    renderColumna(quirofano, porEstado.Q, "Q");
+    renderColumna(recuperacion, porEstado.R, "R");
+
+    // Actualizar contadores en headers
+    document.getElementById('count-preparacion').textContent = porEstado.P.length;
+    document.getElementById('count-quirofano').textContent = porEstado.Q.length;
+    document.getElementById('count-recuperacion').textContent = porEstado.R.length;
+
+    // Habilitar drop zones
+    habilitarDropZones();
 }
 
-// ========== BÚSQUEDA ==========
-if (buscador) {
-    buscador.oninput = function() {
-        mostrarPacientes(buscador.value);
-    };
-}
-
-function mostrarPacientes(filtro) {
-    if (!lista) return;
-    
-    lista.innerHTML = "";
-    const filtrados = pacientes.filter(p =>
-        p.nombre.toLowerCase().includes(filtro.toLowerCase()) ||
-        p.identificacion.includes(filtro)
-    );
-    
-    if (filtrados.length === 0) {
-        lista.innerHTML = '<li class="px-4 py-8 text-center text-gray-500">No se encontraron pacientes</li>';
+// ========== RENDERIZAR COLUMNA ==========
+function renderColumna(contenedor, pacientes, estadoActual) {
+    if (pacientes.length === 0) {
+        contenedor.innerHTML = `
+            <div class="columna-vacia">
+                <i class="fas fa-inbox"></i>
+                <p>Arrastra pacientes aquí</p>
+            </div>
+        `;
         return;
     }
-    
-    filtrados.forEach(p => {
-        const li = document.createElement("li");
-        li.className = "px-4 py-3 border-b border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors";
-        li.textContent = `${p.identificacion} - ${p.nombre}`;
-        li.onclick = function() {
-            insertarPaciente(p.identificacion, p.nombre);
-            popup.classList.add("hidden");
-        };
-        lista.appendChild(li);
+
+    pacientes.forEach(p => {
+        const tarjeta = crearTarjetaPaciente(p, estadoActual);
+        contenedor.appendChild(tarjeta);
     });
 }
 
-// ========== INSERTAR ==========
+// ========== CREAR TARJETA DE PACIENTE (DRAGGABLE) ==========
+function crearTarjetaPaciente(paciente, estadoActual) {
+    const tarjeta = document.createElement('div');
+    tarjeta.className = 'paciente-tarjeta';
+    tarjeta.dataset.id = paciente.id;
+    tarjeta.dataset.estado = estadoActual;
+    tarjeta.draggable = true;
+    
+    tarjeta.innerHTML = `
+        <div class="drag-handle">
+            <i class="fas fa-grip-vertical"></i>
+        </div>
+        <div class="paciente-contenido">
+            <div class="paciente-header">
+                <div class="paciente-id">
+                    <i class="fas fa-id-card"></i>
+                    <span>${paciente.id}</span>
+                </div>
+                <button class="btn-icon eliminar" onclick="abrirModalEliminar('${paciente.id}', '${paciente.nombre}')" title="Eliminar paciente">
+                    <i class="fas fa-trash-alt"></i>
+                </button>
+            </div>
+            <div class="paciente-nombre">
+                <i class="fas fa-user"></i>
+                ${paciente.nombre}
+            </div>
+        </div>
+    `;
+    
+    // Event listeners para drag
+    tarjeta.addEventListener('dragstart', handleDragStart);
+    tarjeta.addEventListener('dragend', handleDragEnd);
+    
+    return tarjeta;
+}
+
+// ========== DRAG & DROP HANDLERS ==========
+function handleDragStart(e) {
+    elementoArrastrado = this;
+    this.classList.add('arrastrando');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', this.innerHTML);
+}
+
+function handleDragEnd(e) {
+    this.classList.remove('arrastrando');
+    
+    // Remover clases de hover de todas las columnas
+    document.querySelectorAll('.lista-pacientes').forEach(lista => {
+        lista.classList.remove('drag-over');
+    });
+}
+
+function habilitarDropZones() {
+    const zonas = document.querySelectorAll('.lista-pacientes');
+    
+    zonas.forEach(zona => {
+        zona.addEventListener('dragover', handleDragOver);
+        zona.addEventListener('drop', handleDrop);
+        zona.addEventListener('dragenter', handleDragEnter);
+        zona.addEventListener('dragleave', handleDragLeave);
+    });
+}
+
+function handleDragOver(e) {
+    if (e.preventDefault) {
+        e.preventDefault();
+    }
+    e.dataTransfer.dropEffect = 'move';
+    return false;
+}
+
+function handleDragEnter(e) {
+    this.classList.add('drag-over');
+}
+
+function handleDragLeave(e) {
+    // Solo remover si realmente salimos del contenedor
+    if (e.target === this) {
+        this.classList.remove('drag-over');
+    }
+}
+
+function handleDrop(e) {
+    if (e.stopPropagation) {
+        e.stopPropagation();
+    }
+    
+    this.classList.remove('drag-over');
+    
+    if (elementoArrastrado) {
+        const identificacion = elementoArrastrado.dataset.id;
+        const estadoActual = elementoArrastrado.dataset.estado;
+        
+        // Determinar el nuevo estado según el contenedor
+        let nuevoEstado;
+        if (this.id === 'lista-preparacion') nuevoEstado = 'P';
+        else if (this.id === 'lista-quirofano') nuevoEstado = 'Q';
+        else if (this.id === 'lista-recuperacion') nuevoEstado = 'R';
+        
+        // Solo actualizar si cambió el estado
+        if (nuevoEstado && nuevoEstado !== estadoActual) {
+            cambiarEstado(identificacion, nuevoEstado);
+        }
+    }
+    
+    return false;
+}
+
+// ========== ACTUALIZAR ESTADÍSTICAS ==========
+function actualizarEstadisticas() {
+    const stats = {
+        P: 0,
+        Q: 0,
+        R: 0
+    };
+
+    pacientes.forEach(p => {
+        if (stats[p.estado] !== undefined) {
+            stats[p.estado]++;
+        }
+    });
+
+    // Actualizar los números en la barra superior
+    document.getElementById('stat-preparacion').textContent = stats.P;
+    document.getElementById('stat-quirofano').textContent = stats.Q;
+    document.getElementById('stat-recuperacion').textContent = stats.R;
+    document.getElementById('stat-total').textContent = pacientes.length;
+    
+    console.log('📊 Estadísticas actualizadas:', stats, 'Total:', pacientes.length);
+}
+
+
+// ========== CAMBIAR ESTADO ==========
+function cambiarEstado(identificacion, nuevoEstado) {
+    fetch("/tableros/cirugia/pacientes/estado", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identificacion, estado: nuevoEstado })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            cargarPacientes();
+            mostrarNotificacion('Estado actualizado correctamente', 'success');
+        } else {
+            mostrarNotificacion('Error al actualizar estado', 'error');
+            cargarPacientes(); // Recargar para restaurar el estado anterior
+        }
+    })
+    .catch(err => {
+        console.error("Error:", err);
+        mostrarNotificacion('Error de conexión', 'error');
+        cargarPacientes();
+    });
+}
+
+// ========== MODAL INSERTAR ==========
+function abrirModalInsertar() {
+    document.getElementById("modalInsertar").style.display = "flex";
+    cargarPacientesDisponibles();
+}
+
+function cerrarModalInsertar() {
+    document.getElementById("modalInsertar").style.display = "none";
+}
+
+function cargarPacientesDisponibles() {
+    const contenedor = document.getElementById("lista-pacientes-disponibles");
+    contenedor.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i><p>Cargando pacientes...</p></div>';
+
+    fetch("/tableros/cirugia/pacientes/disponibles")
+        .then(r => r.json())
+        .then(data => {
+            if (data.success && Array.isArray(data.pacientes)) {
+                pacientesDisponibles = data.pacientes;
+                renderizarPacientesDisponibles(data.pacientes);
+            }
+        })
+        .catch(err => {
+            console.error("Error:", err);
+            contenedor.innerHTML = '<p style="text-align: center; color: #f44336;">Error al cargar pacientes</p>';
+        });
+}
+
+function renderizarPacientesDisponibles(pacientes) {
+    const contenedor = document.getElementById("lista-pacientes-disponibles");
+    
+    if (pacientes.length === 0) {
+        contenedor.innerHTML = '<p style="text-align: center; color: #999;">No hay pacientes disponibles</p>';
+        return;
+    }
+
+    contenedor.innerHTML = '';
+    pacientes.forEach(p => {
+        const item = document.createElement('div');
+        item.className = 'paciente-disponible';
+        item.onclick = () => insertarPaciente(p.id, p.nombre);
+        item.innerHTML = `
+            <div class="paciente-disponible-nombre">${p.nombre}</div>
+            <div class="paciente-disponible-id">ID: ${p.id}</div>
+        `;
+        contenedor.appendChild(item);
+    });
+}
+
 function insertarPaciente(identificacion, nombre) {
     fetch("/tableros/cirugia/pacientes", {
         method: "POST",
@@ -159,142 +292,156 @@ function insertarPaciente(identificacion, nombre) {
     .then(r => r.json())
     .then(data => {
         if (data.success) {
-            cargarPacientesTablero();
+            cerrarModalInsertar();
+            cargarPacientes();
+            mostrarNotificacion('Paciente agregado correctamente', 'success');
         } else {
-            alert(data.error || "Error al insertar paciente.");
+            mostrarNotificacion(data.error || 'Error al agregar paciente', 'error');
         }
     })
-    .catch(error => {
-        console.error("Error:", error);
-        alert("Error al insertar paciente.");
+    .catch(err => {
+        console.error("Error:", err);
+        mostrarNotificacion('Error de conexión', 'error');
     });
 }
 
-// ========== CAMBIAR ESTADO ==========
-function cambiarEstadoPaciente(identificacion, nuevoEstado) {
-    const estadoLetra = descripcionAEstadoLetra(nuevoEstado);
-    
-    fetch("/tableros/cirugia/pacientes/estado", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identificacion, estado: estadoLetra })
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            cargarPacientesTablero();
-        } else {
-            alert(data.error || "Error al cambiar estado.");
-        }
-    })
-    .catch(error => {
-        console.error("Error:", error);
-        alert("Error al cambiar estado.");
-    });
+// ========== MODAL ELIMINAR ==========
+function abrirModalEliminar(identificacion, nombre) {
+    identificacionEliminar = identificacion;
+    document.getElementById("nombre-eliminar").textContent = nombre;
+    document.getElementById("id-eliminar").textContent = `ID: ${identificacion}`;
+    document.getElementById("modalEliminar").style.display = "flex";
 }
 
-// ========== ELIMINAR ==========
-function eliminarPaciente(identificacion) {
-    if (!confirm("¿Está seguro de eliminar este paciente del tablero?")) {
-        return;
-    }
-    
+function cerrarModalEliminar() {
+    document.getElementById("modalEliminar").style.display = "none";
+    identificacionEliminar = null;
+}
+
+function confirmarEliminar() {
+    if (!identificacionEliminar) return;
+
     fetch("/tableros/cirugia/pacientes", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identificacion })
+        body: JSON.stringify({ identificacion: identificacionEliminar })
     })
     .then(r => r.json())
     .then(data => {
         if (data.success) {
-            cargarPacientesTablero();
+            cerrarModalEliminar();
+            cargarPacientes();
+            mostrarNotificacion('Paciente eliminado correctamente', 'success');
         } else {
-            alert(data.error || "Error al eliminar paciente.");
+            mostrarNotificacion('Error al eliminar paciente', 'error');
         }
     })
-    .catch(error => {
-        console.error("Error:", error);
-        alert("Error al eliminar paciente.");
+    .catch(err => {
+        console.error("Error:", err);
+        mostrarNotificacion('Error de conexión', 'error');
     });
 }
 
-// ========== RENDERIZAR TARJETAS ULTRA COMPACTAS ==========
-function renderTarjetas() {
-    if (!contenedor) return;
-    
-    contenedor.innerHTML = "";
-    
-    if (pacientesTablero.length === 0) {
-        contenedor.innerHTML = `
-            <div class="col-span-2 bg-white rounded-lg shadow p-12 text-center text-gray-500">
-                <p class="text-lg font-medium">No hay pacientes en el tablero</p>
-                <p class="text-sm mt-2">Haz clic en "Insertar Paciente" para agregar uno</p>
-            </div>
-        `;
-        return;
+// ========== BÚSQUEDA ==========
+document.addEventListener('DOMContentLoaded', () => {
+    const buscarInput = document.getElementById('buscar-paciente');
+    if (buscarInput) {
+        buscarInput.addEventListener('input', (e) => {
+            const texto = e.target.value.toLowerCase();
+            const tarjetas = document.querySelectorAll('.paciente-tarjeta');
+            
+            tarjetas.forEach(tarjeta => {
+                const nombre = tarjeta.querySelector('.paciente-nombre').textContent.toLowerCase();
+                const id = tarjeta.dataset.id.toLowerCase();
+                
+                if (nombre.includes(texto) || id.includes(texto)) {
+                    tarjeta.style.display = 'block';
+                } else {
+                    tarjeta.style.display = 'none';
+                }
+            });
+        });
     }
+
+    const buscarModalInput = document.getElementById('buscar-paciente-modal');
+    if (buscarModalInput) {
+        buscarModalInput.addEventListener('input', (e) => {
+            const texto = e.target.value.toLowerCase();
+            const items = document.querySelectorAll('.paciente-disponible');
+            
+            items.forEach(item => {
+                const nombre = item.querySelector('.paciente-disponible-nombre').textContent.toLowerCase();
+                const id = item.querySelector('.paciente-disponible-id').textContent.toLowerCase();
+                
+                if (nombre.includes(texto) || id.includes(texto)) {
+                    item.style.display = 'block';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        });
+    }
+});
+
+// ========== NOTIFICACIONES ==========
+function mostrarNotificacion(mensaje, tipo) {
+    const notif = document.createElement('div');
+    notif.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 20px;
+        background: ${tipo === 'success' ? '#4CAF50' : '#f44336'};
+        color: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        z-index: 10000;
+        animation: slideInRight 0.3s;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    `;
+    notif.innerHTML = `<i class="fas fa-${tipo === 'success' ? 'check-circle' : 'exclamation-circle'}"></i> ${mensaje}`;
     
-    pacientesTablero.forEach(p => {
-        const card = document.createElement("div");
-        card.className = "bg-white rounded-lg shadow hover:shadow-md transition-shadow py-2 px-3";
-        
-        card.innerHTML = `
-            <div class="flex items-center justify-between gap-3">
-                <!-- DATOS DEL PACIENTE -->
-                <div class="seccion-paciente flex-1 min-w-0">
-                    <div class="mb-0.5">
-                        <span class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Paciente</span>
-                    </div>
-                    <h3 class="text-sm font-bold text-gray-800 truncate leading-tight">${p.nombre}</h3>
-                    <p class="text-xs text-gray-500 mt-0.5">ID: ${p.identificacion}</p>
-                </div>
-                
-                <!-- ESTADOS -->
-                <div class="seccion-estados flex-shrink-0">
-                    <div class="mb-0.5 text-center">
-                        <span class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Estados</span>
-                    </div>
-                    <div class="flex gap-2">
-                        <div class="estado-item" onclick="cambiarEstadoPaciente('${p.identificacion}', 'PREPARACION')">
-                            <div class="estado-circulo preparacion ${p.estado === 'PREPARACION' ? 'activo' : ''}">
-                                ${getIconoEstado('PREPARACION')}
-                            </div>
-                            <span class="text-xs text-gray-500 font-medium">Prep.</span>
-                        </div>
-                        
-                        <div class="estado-item" onclick="cambiarEstadoPaciente('${p.identificacion}', 'CIRUGIA')">
-                            <div class="estado-circulo cirugia ${p.estado === 'CIRUGIA' ? 'activo' : ''}">
-                                ${getIconoEstado('CIRUGIA')}
-                            </div>
-                            <span class="text-xs text-gray-500 font-medium">Cirugía</span>
-                        </div>
-                        
-                        <div class="estado-item" onclick="cambiarEstadoPaciente('${p.identificacion}', 'RECUPERACION')">
-                            <div class="estado-circulo recuperacion ${p.estado === 'RECUPERACION' ? 'activo' : ''}">
-                                ${getIconoEstado('RECUPERACION')}
-                            </div>
-                            <span class="text-xs text-gray-500 font-medium">Recup.</span>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- ACCIONES -->
-                <div class="seccion-acciones flex-shrink-0">
-                    <div class="mb-0.5 text-center">
-                        <span class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Acciones</span>
-                    </div>
-                    <div class="flex gap-2">
-                        <div class="accion-item" onclick="eliminarPaciente('${p.identificacion}')">
-                            <div class="accion-circulo eliminar">
-                                ${iconos.eliminar}
-                            </div>
-                            <span class="text-xs text-gray-500 font-medium">Eliminar</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        contenedor.appendChild(card);
-    });
+    document.body.appendChild(notif);
+    
+    setTimeout(() => {
+        notif.style.animation = 'slideOutRight 0.3s';
+        setTimeout(() => notif.remove(), 300);
+    }, 3000);
 }
+
+// ========== ACTUALIZAR HORA ==========
+function actualizarHora() {
+    const ahora = new Date();
+    const hora = ahora.toLocaleTimeString('es-CO');
+    document.getElementById('hora-actualizacion').textContent = hora;
+}
+
+// ========== CERRAR MODALES CON ESC ==========
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        cerrarModalInsertar();
+        cerrarModalEliminar();
+    }
+});
+
+// ========== INICIALIZAR ==========
+window.addEventListener("DOMContentLoaded", () => {
+    cargarPacientes();
+    setInterval(cargarPacientes, 5000);
+});
+
+// Agregar animaciones CSS
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideInRight {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes slideOutRight {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(100%); opacity: 0; }
+    }
+`;
+document.head.appendChild(style);
