@@ -26,14 +26,6 @@ function validarAccesoConToken() {
     console.log('Validando token:', TOKEN);
     console.log('ID para validar:', IDENTIFICACION);
     
-    // Timeout de 10 segundos
-    const timeoutId = setTimeout(() => {
-        console.error('⏱️ Timeout: La validación tardó demasiado');
-        document.getElementById('loader').style.display = 'none';
-        document.getElementById('formulario-acceso').style.display = 'block';
-        mostrarError('Tiempo de espera agotado. Ingrese la clave manualmente.');
-    }, 10000);
-    
     fetch('/tableros/cirugia/paciente/validar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -43,13 +35,7 @@ function validarAccesoConToken() {
         })
     })
     .then(response => {
-        clearTimeout(timeoutId);
         console.log('Status HTTP:', response.status);
-        
-        if (!response.ok) {
-            throw new Error('HTTP ' + response.status);
-        }
-        
         return response.json();
     })
     .then(data => {
@@ -65,15 +51,14 @@ function validarAccesoConToken() {
             console.error('❌ Token inválido o expirado:', data.error);
             document.getElementById('loader').style.display = 'none';
             document.getElementById('formulario-acceso').style.display = 'block';
-            mostrarError(data.error || 'Acceso denegado');
+            mostrarError('Acceso expirado. Ingrese la clave manualmente.');
         }
     })
     .catch(err => {
-        clearTimeout(timeoutId);
         console.error('❌ Error al validar token:', err);
         document.getElementById('loader').style.display = 'none';
         document.getElementById('formulario-acceso').style.display = 'block';
-        mostrarError('Error de conexión. Intente con la clave.');
+        mostrarError('Error de conexión');
     });
 }
 
@@ -94,7 +79,7 @@ function validarAcceso() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
             identificacion: IDENTIFICACION, 
-            clave: clave
+            clave 
         })
     })
     .then(r => r.json())
@@ -112,7 +97,7 @@ function validarAcceso() {
     })
     .catch(err => {
         console.error('Error:', err);
-        mostrarError('Error de conexión');
+        mostrarError('Error de conexión')
     });
 }
 
@@ -182,7 +167,7 @@ function actualizarEstadoConClave() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
             identificacion: IDENTIFICACION, 
-            clave: clave
+            clave 
         })
     })
     .then(r => r.json())
@@ -221,3 +206,59 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+// ========== VALIDAR ACCESO CON TOKEN ==========
+function validarAccesoConToken() {
+    console.log('Validando token:', TOKEN);
+    console.log('ID para validar:', IDENTIFICACION);
+    
+    // Timeout de 10 segundos
+    const timeoutId = setTimeout(() => {
+        console.error('⏱️ Timeout: La validación tardó demasiado');
+        document.getElementById('loader').style.display = 'none';
+        document.getElementById('formulario-acceso').style.display = 'block';
+        mostrarError('Tiempo de espera agotado. Ingrese la clave manualmente.');
+    }, 10000);
+    
+    fetch('/tableros/cirugia/paciente/validar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            identificacion: IDENTIFICACION, 
+            token: TOKEN 
+        })
+    })
+    .then(response => {
+        clearTimeout(timeoutId);
+        console.log('Status HTTP:', response.status);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        return response.json();
+    })
+    .then(data => {
+        console.log('Respuesta validación con token:', data);
+        
+        if (data.success) {
+            console.log('✅ Token válido, mostrando datos');
+            mostrarDatosPaciente(data.paciente);
+            document.getElementById('loader').style.display = 'none';
+            document.getElementById('datos-paciente').style.display = 'block';
+            intervalo = setInterval(() => actualizarEstadoConToken(), 5000);
+        } else {
+            console.error('❌ Token inválido o expirado:', data.error);
+            document.getElementById('loader').style.display = 'none';
+            document.getElementById('formulario-acceso').style.display = 'block';
+            mostrarError(data.error || 'Acceso denegado');
+        }
+    })
+    .catch(err => {
+        clearTimeout(timeoutId);
+        console.error('❌ Error al validar token:', err);
+        document.getElementById('loader').style.display = 'none';
+        document.getElementById('formulario-acceso').style.display = 'block';
+        mostrarError('Error de conexión. Intente con la clave.');
+    });
+}
