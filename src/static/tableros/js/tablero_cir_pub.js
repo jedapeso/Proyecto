@@ -69,10 +69,16 @@ function renderColumna(contenedor, pacientes) {
         return;
     }
 
-
     pacientes.forEach(p => {
         // Ocultar últimos 4 dígitos
         const idOculto = p.identificacion.slice(0, -4) + '****';
+        
+        // Mostrar solo los primeros 3 caracteres de cada palabra
+        const nombreOculto = p.nombre
+            .split(' ')
+            .filter(palabra => palabra.length > 0)  // Eliminar elementos vacíos
+            .map(palabra => palabra.substring(0, 3) + '***')
+            .join(' ');
        
         const card = document.createElement("div");
         card.className = "paciente-card clickeable";
@@ -86,7 +92,7 @@ function renderColumna(contenedor, pacientes) {
                 </div>
                 <div class="paciente-linea">
                     <span class="label">Paciente:</span>
-                    <span class="valor">${p.nombre}</span>
+                    <span class="valor">${nombreOculto}</span>
                 </div>
             </div>
             <div class="icono-tap"><i class="fas fa-qrcode"></i>
@@ -96,7 +102,6 @@ function renderColumna(contenedor, pacientes) {
         contenedor.appendChild(card);
     });
 }
-
 
 // ========== SELECCIONAR PACIENTE Y PEDIR CLAVE ==========
 function seleccionarPaciente(paciente) {

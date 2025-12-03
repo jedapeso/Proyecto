@@ -528,4 +528,6 @@ body {
 
 @media (max-width: 768px) {
     .header-content {
-        flex-direction
+        flex-direction :column;
+    }
+}
