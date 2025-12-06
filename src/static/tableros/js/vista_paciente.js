@@ -146,42 +146,41 @@ function mostrarMensajeRecuperacion(estado) {
 
 
 // ========== ACTUALIZAR VISUAL DEL ESTADO ==========
+// ========== ACTUALIZAR VISUAL DEL ESTADO ==========
 function actualizarEstadoVisual(estado) {
   console.log('Actualizando estado visual:', estado);
 
-
-  // mismos textos e iconos que las tarjetas del panel
   const nombres = {
     P: { es: 'Preparación',  en: 'Preparation' },
     Q: { es: 'Quirófano',    en: 'Operating Room' },
     R: { es: 'Recuperación', en: 'Recovery' }
   };
 
-
-    const iconos = {
-    P: "{{ url_for('static', filename='img/preparacion_icon.png') }}",
-    Q: "{{ url_for('static', filename='img/quirofano_icon.png') }}",
-    R: "{{ url_for('static', filename='img/recuperacion_icon.png') }}"
-    };
-
-
-  const colores = {
-    P: '#00B4D8', // azul preparación
-    Q: '#90A4AE', // gris quirófano
-    R: '#2E9B3E'  // verde recuperación
+  // ICONOS DE FONT AWESOME (como en el tablero público)
+  const iconos = {
+    P: 'fas fa-user-clock',      // Preparación
+    Q: 'fas fa-procedures',      // Quirófano
+    R: 'fas fa-bed'              // Recuperación
   };
 
+  const colores = {
+    P: '#00B4D8',
+    Q: '#90A4AE',
+    R: '#2E9B3E'
+  };
 
   const info = nombres[estado];
 
+  // Actualizar CLASE del icono (no src)
+  const icono = document.getElementById('iconoEstado');
+  icono.className = iconos[estado] || 'fas fa-question-circle';
+  
+  console.log('✅ Icono asignado:', iconos[estado]);
 
-  document.getElementById('iconoEstado').src = iconos[estado] || '';
   document.getElementById('nombreEstadoES').textContent = info ? info.es : 'DESCONOCIDO';
   document.getElementById('nombreEstadoEN').textContent = info ? info.en : '';
-  document.getElementById('estadoVisual').style.backgroundColor =
-    colores[estado] || '#999';
+  document.getElementById('estadoVisual').style.backgroundColor = colores[estado] || '#999';
 }
-
 
 // ========== ACTUALIZAR ESTADO CON TOKEN ==========
 function actualizarEstadoConToken() {

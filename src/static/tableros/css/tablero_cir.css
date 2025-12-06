@@ -284,7 +284,7 @@ body {
 }
 
 .lista-pacientes {
-    padding: 15px;
+    padding: 4px;
     flex: 1;
     overflow-y: auto;
 }
@@ -293,7 +293,7 @@ body {
 .paciente-tarjeta {
     background: var(--bg-light);
     border-radius: 12px;
-    padding: 15px;
+    padding: 4px;
     margin-bottom: 12px;
     transition: all 0.3s;
     border: 2px solid transparent;

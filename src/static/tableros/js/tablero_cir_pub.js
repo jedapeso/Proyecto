@@ -2,7 +2,6 @@
 let pacientesPublico = [];
 let pacienteSeleccionado = null;
 
-
 // ========== CARGAR PACIENTES ==========
 function cargarPacientesPublico() {
     fetch("/tableros/cirugia/pacientes")
@@ -21,7 +20,6 @@ function cargarPacientesPublico() {
         .catch(err => console.error("Error al cargar pacientes:", err));
 }
 
-
 // ========== CONVERTIR LETRA A DESCRIPCIÓN ==========
 function estadoLetraADescripcion(letra) {
     switch (letra) {
@@ -32,18 +30,15 @@ function estadoLetraADescripcion(letra) {
     }
 }
 
-
 // ========== RENDERIZAR PACIENTES EN COLUMNAS ==========
 function renderizarPacientes() {
     const preparacion = document.getElementById("pacientes-preparacion");
     const quirofano = document.getElementById("pacientes-quirofano");
     const recuperacion = document.getElementById("pacientes-recuperacion");
 
-
     preparacion.innerHTML = "";
     quirofano.innerHTML = "";
     recuperacion.innerHTML = "";
-
 
     const porEstado = {
         PREPARACION: [],
@@ -51,21 +46,18 @@ function renderizarPacientes() {
         RECUPERACION: []
     };
 
-
     pacientesPublico.forEach(p => {
         porEstado[p.estado].push(p);
     });
-
 
     renderColumna(preparacion, porEstado.PREPARACION);
     renderColumna(quirofano, porEstado.QUIROFANO);
     renderColumna(recuperacion, porEstado.RECUPERACION);
 }
 
-
 function renderColumna(contenedor, pacientes) {
     if (pacientes.length === 0) {
-        contenedor.innerHTML = '<div class="sin-pacientes">No hay pacientes en esta área</div>';
+        contenedor.innerHTML = '<div class="sin-pacientes"><i class="fas fa-inbox"></i><p>No hay pacientes en esta área</p></div>';
         return;
     }
 
@@ -76,28 +68,29 @@ function renderColumna(contenedor, pacientes) {
         // Mostrar solo los primeros 3 caracteres de cada palabra
         const nombreOculto = p.nombre
             .split(' ')
-            .filter(palabra => palabra.length > 0)  // Eliminar elementos vacíos
+            .filter(palabra => palabra.length > 0)
             .map(palabra => palabra.substring(0, 3) + '***')
             .join(' ');
        
         const card = document.createElement("div");
-        card.className = "paciente-card clickeable";
+        card.className = "paciente-card";
         card.onclick = () => seleccionarPaciente(p);
+        
+        // Estructura moderna como el panel
         card.innerHTML = `
-            <div class="paciente-icon">👤</div>
             <div class="paciente-info">
-                <div class="paciente-linea">
-                    <span class="label">ID:</span>
-                    <span class="valor">${idOculto}</span>
+                <div class="paciente-id">
+                    <i class="fa-regular fa-id-card"></i>
+                    <span>${idOculto}</span>
                 </div>
-                <div class="paciente-linea">
-                    <span class="label">Paciente:</span>
-                    <span class="valor">${nombreOculto}</span>
+                <div class="paciente-nombre">
+                    <i class="fa-regular fa-user"></i>
+                    <span>${nombreOculto}</span>
                 </div>
             </div>
-            <div class="icono-tap"><i class="fas fa-qrcode"></i>
-           </div>
-
+            <button class="btn-qr" onclick="event.stopPropagation(); seleccionarPaciente(${JSON.stringify(p).replace(/"/g, '&quot;')})">
+                <i class="fas fa-qrcode"></i>
+            </button>
         `;
         contenedor.appendChild(card);
     });
@@ -115,7 +108,6 @@ function seleccionarPaciente(paciente) {
         document.getElementById('inputClave').focus();
     }, 100);
 }
-
 
 // ========== VALIDAR CLAVE ==========
 function validarClave() {
@@ -150,7 +142,6 @@ function validarClave() {
     console.log('Clave correcta! Generando QR...');
     generarQRPersonalizado();
 }
-
 
 // ========== GENERAR QR PERSONALIZADO ==========
 function generarQRPersonalizado() {
@@ -199,7 +190,6 @@ function generarQRPersonalizado() {
         });
 }
 
-
 // ========== MOSTRAR ERROR ==========
 function mostrarError(mensaje) {
     const errorElement = document.getElementById('errorClave');
@@ -211,19 +201,16 @@ function mostrarError(mensaje) {
     }, 500);
 }
 
-
 // ========== CERRAR MODALES ==========
 function cerrarModalClave() {
     document.getElementById('modalClave').style.display = 'none';
     pacienteSeleccionado = null;
 }
 
-
 function cerrarModalQR() {
     document.getElementById('modalQR').style.display = 'none';
     pacienteSeleccionado = null;
 }
-
 
 // ========== ACTUALIZAR HORA ==========
 function actualizarHora() {
@@ -235,7 +222,6 @@ function actualizarHora() {
     });
     document.getElementById('hora-actualizacion').textContent = hora;
 }
-
 
 // ========== INICIALIZAR Y AUTO-REFRESCAR ==========
 window.addEventListener("DOMContentLoaded", () => {
@@ -250,6 +236,5 @@ window.addEventListener("DOMContentLoaded", () => {
         });
     }
 });
-
 
 setInterval(cargarPacientesPublico, 5000);
