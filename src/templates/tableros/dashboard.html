@@ -38,21 +38,27 @@
       <h3>Urgencias</h3>
     </a>
 
-    <!-- Cirugía (versión badges) -->
-    <div class="tablero-card cirugia-badges">
-      <div class="card-icon">
-        <i class="fas fa-user-md cirugia-icon"></i>
-      </div>
-      <h3>Cirugía</h3>
+    <!-- Cirugía -->
+    <div class="tablero-card cirugia-card-wrapper">
+      <a href="{{ url_for('tableros.tablero_cirugia_publico') }}" class="tablero-card-link">
+        <div class="card-icon">
+          <i class="fas fa-user-md cirugia-icon"></i>
+        </div>
+        <h3>Cirugía</h3>
+      </a>
       <div class="badges-container">
-        <a href="{{ url_for('tableros.tablero_cir') }}" class="badge-link badge-panel">
-          <i class="fas fa-cog"></i> Panel
-        </a>
-        <a href="{{ url_for('tableros.tablero_cirugia_publico') }}" class="badge-link badge-publico" target="_blank">
-          <i class="fas fa-eye"></i> Público
+        <a href="{{ url_for('tableros.tablero_cir') }}" 
+          class="badge-link badge-panel" 
+          id="badge-panel"
+          onclick="event.stopPropagation();">
+          <i class="fas fa-cog"></i> Panel de Administración
         </a>
       </div>
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='tableros/js/dashboard.js') }}"></script>
 {% endblock %}

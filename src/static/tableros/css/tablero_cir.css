@@ -724,3 +724,109 @@ body {
 .contador.updated {
     animation: pulse 0.4s ease-in-out;
 }
+/* ========== ALERTAS DE CAPACIDAD ========== */
+
+/* Tarjeta con capacidad excedida */
+.stat-card.capacidad-excedida {
+    background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+    color: white !important;
+    animation: pulsoAlerta 1.5s ease-in-out infinite;
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.6) !important;
+    border-color: #b91c1c !important;
+}
+
+.stat-card.capacidad-excedida i,
+.stat-card.capacidad-excedida .stat-number,
+.stat-card.capacidad-excedida .stat-label {
+    color: white !important;
+}
+
+/* Tarjeta cerca del límite */
+.stat-card.capacidad-advertencia {
+    background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+    color: white !important;
+    box-shadow: 0 0 15px rgba(245, 158, 11, 0.4) !important;
+    border-color: #b45309 !important;
+}
+
+.stat-card.capacidad-advertencia i,
+.stat-card.capacidad-advertencia .stat-number,
+.stat-card.capacidad-advertencia .stat-label {
+    color: white !important;
+}
+
+/* Tarjeta OK */
+.stat-card.capacidad-ok {
+    /* Mantiene estilos normales */
+}
+
+/* Animación de pulso para alerta */
+@keyframes pulsoAlerta {
+    0%, 100% { 
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% { 
+        opacity: 0.9;
+        transform: scale(1.03);
+    }
+}
+
+/* Icono de alerta titilante */
+.icono-alerta {
+    display: inline-block;
+    margin-left: 6px;
+    animation: titilar 0.8s ease-in-out infinite;
+    font-size: 14px;
+    color: white;
+}
+
+.icono-alerta-media {
+    display: inline-block;
+    margin-left: 6px;
+    font-size: 13px;
+    color: white;
+    opacity: 0.9;
+}
+
+@keyframes titilar {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+/* Tooltip de capacidad - en la esquina derecha */
+.tooltip-capacidad {
+    position: absolute;
+    top: 50%;
+    right: 15px;
+    transform: translateY(-50%) scale(0.95);
+    background: rgba(0, 0, 0, 0.85);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s ease;
+    z-index: 1000;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Sin flecha ya que está al lado */
+.tooltip-capacidad::after {
+    display: none;
+}
+
+.stat-card:hover .tooltip-capacidad {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+    right: 12px;  /* se acerca un poco al hacer hover */
+}
+
+/* Asegurar que stat-card tenga position relative */
+.stat-card {
+    position: relative;
+    overflow: visible;
+}

@@ -8,7 +8,7 @@ body {
 }
 
 .dashboard-header h1 {
-  font-size: 2rem;
+  font-size: 2.5rem;
   font-weight: 600;
   color: #343a40;
 }
@@ -28,6 +28,7 @@ body {
   color: #343a40;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  min-height: 200px;
 }
 
 .tablero-card:hover {
@@ -35,8 +36,15 @@ body {
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
 }
 
+.tablero-card h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #343a40;
+  margin: 0;
+}
+
 .card-icon {
-  font-size: 2.5rem;
+  font-size: 3.5rem;
   margin-bottom: 1rem;
 }
 
@@ -46,69 +54,94 @@ body {
 .tablero-card .urgencias-icon { color: #fd7e14; }  /* Naranja */
 .tablero-card .cirugia-icon { color: #20c997; }    /* Verde */
 
-/* Tarjeta de Cirugía - Versión Badges */
-.cirugia-badges {
-    display: flex;
-    flex-direction: column;
-    padding: 20px;
-    cursor: default;
+/* ========== TARJETA DE CIRUGÍA CON BADGE ========== */
+
+/* Wrapper de la tarjeta de cirugía - MISMO estilo que tablero-card */
+.cirugia-card-wrapper {
+  position: relative;
+  background: #fff;
+  border-radius: 0.75rem;
+  padding: 2rem 1rem;
+  text-align: center;
+  color: #343a40;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
 }
 
-.cirugia-badges:hover {
-    transform: translateY(-5px);
+.cirugia-card-wrapper:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
 }
 
+/* Ícono de cirugía - MISMO tamaño que las otras */
+.cirugia-card-wrapper .cirugia-icon {
+  color: #20c997;
+}
+
+.cirugia-card-wrapper .card-icon {
+  font-size: 3.5rem;
+  margin-bottom: 1rem;
+}
+
+/* Enlace principal de la tarjeta */
+.tablero-card-link {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  color: #343a40;
+  flex-grow: 1;
+}
+
+.tablero-card-link h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #343a40;
+  margin: 0;
+  text-decoration: none;
+}
+
+.tablero-card-link:hover h3 {
+  color: #343a40;
+  text-decoration: none;
+}
+
+/* Badge debajo del nombre - más espacio arriba */
 .badges-container {
-    display: flex;
-    gap: 8px;
-    margin-top: 10px;
-    justify-content: center;
-    flex-wrap: wrap;
+  display: flex;
+  gap: 8px;
+  margin-top: 1.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
 }
 
 .badge-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 6px 14px;
-    border-radius: 20px;
-    text-decoration: none;
-    font-size: 12px;
-    font-weight: 600;
-    color: white;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.15);
 }
 
 .badge-link i {
-    font-size: 12px;
+  font-size: 12px;
 }
 
 .badge-panel {
-    background: linear-gradient(135deg, #1976D2, #1565C0);
+  background: linear-gradient(135deg, #1976D2, #1565C0);
 }
 
 .badge-panel:hover {
-    background: linear-gradient(135deg, #1565C0, #0D47A1);
-    transform: translateY(-2px);
-    box-shadow: 0 3px 8px rgba(25, 118, 210, 0.4);
-}
-
-.badge-publico {
-    background: linear-gradient(135deg, #00ACC1, #00838F);
-}
-
-.badge-publico:hover {
-    background: linear-gradient(135deg, #00838F, #006064);
-    transform: translateY(-2px);
-    box-shadow: 0 3px 8px rgba(0, 172, 193, 0.4);
-}
-
-/* Asegurar altura uniforme */
-.tablero-card {
-    min-height: 200px;
-}
-
-.cirugia-badges {
-    min-height: 200px;
+  background: linear-gradient(135deg, #1565C0, #0D47A1);
+  transform: translateY(-2px);
+  box-shadow: 0 3px 8px rgba(25, 118, 210, 0.4);
 }
