@@ -755,11 +755,6 @@ body {
     color: white !important;
 }
 
-/* Tarjeta OK */
-.stat-card.capacidad-ok {
-    /* Mantiene estilos normales */
-}
-
 /* Animación de pulso para alerta */
 @keyframes pulsoAlerta {
     0%, 100% { 
