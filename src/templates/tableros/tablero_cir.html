@@ -187,8 +187,10 @@
             </div>
         </div>
     </div>
-
-
+    <!-- Cargar CONFIG primero -->
+    <script src="{{ url_for('static', filename='tableros/js/config_tablero.js') }}"></script>
+    <!-- Luego el script del panel -->
     <script src="{{ url_for('static', filename='tableros/js/tablero_cir.js') }}"></script>
+
 </body>
 </html>

@@ -1,23 +1,25 @@
-// VARIABLES GLOBALES
+// ========== VARIABLES GLOBALES ==========
 let pacientes = [];
 let pacientesDisponibles = [];
 let identificacionEliminar = null;
 let elementoArrastrado = null;
+let llamadoActivo = null;
 
-// ========== CONFIGURACIÓN DE CAPACIDADES ==========
-const CAPACIDADES = {
-  P: 5,   // Preparación: 5 cubículos
-  Q: 7,   // Quirófano: 7 salas
-  R: 14   // Recuperación: 14 camas
-};
-
-// CARGAR PACIENTES DEL TABLERO
+// ========== CARGAR PACIENTES (CON DETECCIÓN DE CAMBIO DE LLAMADO) ==========
 function cargarPacientes() {
   fetch('/tableros/cirugia/pacientes')
     .then(r => r.json())
     .then(data => {
-      console.log('Pacientes recibidos:', data);
       if (data.success && Array.isArray(data.pacientes)) {
+        // 🔥 Verificar si el llamado activo ya no existe
+        if (llamadoActivo) {
+          const pacienteConLlamado = data.pacientes.find(p => p.llamado === true);
+          if (!pacienteConLlamado) {
+            console.log('🔓 Llamado finalizado, desbloqueando toggles');
+            llamadoActivo = null; // 🔥 Desbloquear
+          }
+        }
+        
         pacientes = data.pacientes;
         renderizarTablero();
         actualizarEstadisticas();
@@ -27,7 +29,8 @@ function cargarPacientes() {
     .catch(err => console.error('Error al cargar pacientes:', err));
 }
 
-// RENDERIZAR TABLERO
+
+// ========== RENDERIZAR TABLERO ==========
 function renderizarTablero() {
   const preparacion = document.getElementById('lista-preparacion');
   const quirofano = document.getElementById('lista-quirofano');
@@ -38,24 +41,18 @@ function renderizarTablero() {
   recuperacion.innerHTML = '';
 
   const porEstado = { P: [], Q: [], R: [] };
-
-  // Agrupar pacientes por estado
   pacientes.forEach(p => {
-    if (porEstado[p.estado]) {
-      porEstado[p.estado].push(p);
-    }
+    if (porEstado[p.estado]) porEstado[p.estado].push(p);
   });
 
-  // Renderizar cada columna
   renderColumna(preparacion, porEstado.P, 'P');
   renderColumna(quirofano, porEstado.Q, 'Q');
   renderColumna(recuperacion, porEstado.R, 'R');
 
-  // Habilitar drop zones
   habilitarDropZones();
 }
 
-// RENDERIZAR COLUMNA
+// ========== RENDERIZAR COLUMNA ==========
 function renderColumna(contenedor, pacientes, estadoActual) {
   if (pacientes.length === 0) {
     contenedor.innerHTML = `
@@ -73,13 +70,16 @@ function renderColumna(contenedor, pacientes, estadoActual) {
   });
 }
 
-// CREAR TARJETA DE PACIENTE DRAGGABLE
+// ========== CREAR TARJETA PACIENTE ==========
 function crearTarjetaPaciente(paciente, estadoActual) {
   const tarjeta = document.createElement('div');
   tarjeta.className = 'paciente-tarjeta';
   tarjeta.dataset.id = paciente.id;
   tarjeta.dataset.estado = estadoActual;
   tarjeta.draggable = true;
+
+  const esLlamadoActivo = paciente.llamado === true;
+  const disabled = llamadoActivo && llamadoActivo !== paciente.id ? 'disabled' : '';
 
   tarjeta.innerHTML = `
     <div class="drag-handle">
@@ -91,9 +91,24 @@ function crearTarjetaPaciente(paciente, estadoActual) {
           <i class="fas fa-id-card"></i>
           <span>${paciente.id}</span>
         </div>
-        <button class="btn-icon eliminar" onclick="abrirModalEliminar('${paciente.id}', '${paciente.nombre}')" title="Eliminar paciente">
-          <i class="fas fa-trash-alt"></i>
-        </button>
+        <div class="acciones-paciente">
+          <div class="toggle-llamado-container">
+            <i class="fas fa-bell toggle-bell-icon"></i>
+            <label class="toggle-llamado ${disabled ? 'disabled' : ''}">
+              <input type="checkbox" 
+                     ${esLlamadoActivo ? 'checked' : ''} 
+                     ${disabled}
+                     onchange="toggleLlamado('${paciente.id}', this.checked)"
+                     id="toggle-${paciente.id}">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <button class="btn-icon eliminar" 
+                  onclick="abrirModalEliminar('${paciente.id}', '${paciente.nombre}')" 
+                  title="Eliminar paciente">
+            <i class="fas fa-trash-alt"></i>
+          </button>
+        </div>
       </div>
       <div class="paciente-nombre">
         <i class="fas fa-user"></i>
@@ -102,14 +117,62 @@ function crearTarjetaPaciente(paciente, estadoActual) {
     </div>
   `;
 
-  // Event listeners para drag
   tarjeta.addEventListener('dragstart', handleDragStart);
   tarjeta.addEventListener('dragend', handleDragEnd);
 
   return tarjeta;
 }
 
-// DRAG DROP HANDLERS
+// ========== TOGGLE LLAMADO (SIMPLIFICADO - SIN TIMERS) ==========
+function toggleLlamado(identificacion, activar) {
+  console.log('🔔 Toggle llamado:', identificacion, activar);
+  
+  if (activar && llamadoActivo && llamadoActivo !== identificacion) {
+    mostrarNotificacion('Ya hay un llamado activo. Espere a que finalice.', 'error');
+    const checkbox = document.getElementById(`toggle-${identificacion}`);
+    if (checkbox) checkbox.checked = false;
+    return;
+  }
+  
+  fetch('/tableros/cirugia/pacientes/llamar', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ 
+      identificacion: identificacion,
+      llamado: activar,
+      mensaje: 'Por favor acérquese a Cirugía'
+    })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      if (activar) {
+        llamadoActivo = identificacion;
+        mostrarNotificacion(`Llamado activado - ${CONFIG_TABLERO.DURACION_LLAMADO_SEG}s`, 'success');
+        console.log(`✅ Llamado activado para ${identificacion}`);
+      } else {
+        llamadoActivo = null;
+        mostrarNotificacion('Llamado desactivado', 'success');
+        console.log('✅ Llamado desactivado');
+      }
+      
+      cargarPacientes();
+      
+    } else {
+      mostrarNotificacion('Error al actualizar llamado', 'error');
+      const checkbox = document.getElementById(`toggle-${identificacion}`);
+      if (checkbox) checkbox.checked = !activar;
+    }
+  })
+  .catch(err => {
+    console.error('Error:', err);
+    mostrarNotificacion('Error de conexión', 'error');
+    const checkbox = document.getElementById(`toggle-${identificacion}`);
+    if (checkbox) checkbox.checked = !activar;
+  });
+}
+
+// ========== DRAG & DROP ==========
 function handleDragStart(e) {
   elementoArrastrado = this;
   this.classList.add('arrastrando');
@@ -119,8 +182,6 @@ function handleDragStart(e) {
 
 function handleDragEnd(e) {
   this.classList.remove('arrastrando');
-
-  // Remover clases de hover de todas las columnas
   document.querySelectorAll('.lista-pacientes').forEach(lista => {
     lista.classList.remove('drag-over');
   });
@@ -173,94 +234,71 @@ function handleDrop(e) {
   return false;
 }
 
-// ========== ACTUALIZAR ESTADÍSTICAS CON ALERTAS ==========
+// ========== ESTADÍSTICAS ==========
 function actualizarEstadisticas() {
-  let countP = 0;
-  let countQ = 0;
-  let countR = 0;
+  let countP = 0, countQ = 0, countR = 0;
 
-  // Contar pacientes por estado
   pacientes.forEach(p => {
     if (p.estado === 'P') countP++;
     else if (p.estado === 'Q') countQ++;
     else if (p.estado === 'R') countR++;
   });
 
-  // Actualizar contadores con alertas
-  actualizarContador('stat-preparacion', 'preparacion', countP, CAPACIDADES.P);
-  actualizarContador('stat-quirofano', 'quirofano', countQ, CAPACIDADES.Q);
-  actualizarContador('stat-recuperacion', 'recuperacion', countR, CAPACIDADES.R);
-
+  actualizarContador('stat-preparacion', 'preparacion', 'P', countP);
+  actualizarContador('stat-quirofano', 'quirofano', 'Q', countQ);
+  actualizarContador('stat-recuperacion', 'recuperacion', 'R', countR);
   document.getElementById('stat-total').textContent = pacientes.length;
-
-  console.log('Estadísticas actualizadas - P:', countP, 'Q:', countQ, 'R:', countR, 'Total:', pacientes.length);
 }
 
-function actualizarContador(elementoId, tipoCard, cantidad, limite) {
+function actualizarContador(elementoId, tipoCard, estadoLetra, cantidad) {
   const elemento = document.getElementById(elementoId);
   const card = document.querySelector(`.stat-card.${tipoCard}`);
 
-  // Actualizar número
   elemento.textContent = cantidad;
-
-  // Limpiar clases previas
   card.classList.remove('capacidad-excedida', 'capacidad-advertencia', 'capacidad-ok');
 
-  // Remover tooltip anterior si existe
   const tooltipPrevio = card.querySelector('.tooltip-capacidad');
   if (tooltipPrevio) tooltipPrevio.remove();
 
-  let mensaje = '';
-
-  // 1) Sobrecupo: solo cuando se pasa del límite
-  if (cantidad > limite) {               // 8, 9...
+  const validacion = CONFIG_TABLERO.validarCapacidad(estadoLetra, cantidad);
+  
+  if (validacion.estado === 'excedida') {
     card.classList.add('capacidad-excedida');
-    mensaje = `Sobrecupo: ${cantidad}/${limite}`;
-  }
-  // 2) Capacidad completa pero SIN rojo
-  else if (cantidad === limite) {        // justo 7
-    card.classList.add('capacidad-ok');  // se ve como normal
-    mensaje = `Capacidad completa: ${cantidad}/${limite}`;
-  }
-  // 3) Resto: disponible
-  else {
+  } else {
     card.classList.add('capacidad-ok');
-    mensaje = `Disponible: ${cantidad}/${limite}`;
   }
 
-
-  // Agregar tooltip flotante
   const tooltip = document.createElement('div');
   tooltip.className = 'tooltip-capacidad';
-  tooltip.innerHTML = mensaje;
+  tooltip.innerHTML = validacion.mensaje;
   card.appendChild(tooltip);
 }
 
-// CAMBIAR ESTADO
+// ========== CAMBIAR ESTADO ==========
 function cambiarEstado(identificacion, nuevoEstado) {
   fetch('/tableros/cirugia/pacientes/estado', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ identificacion, estado: nuevoEstado })
   })
-    .then(r => r.json())
-    .then(data => {
-      if (data.success) {
-        cargarPacientes();
-        mostrarNotificacion('Estado actualizado correctamente', 'success');
-      } else {
-        mostrarNotificacion('Error al actualizar estado', 'error');
-        cargarPacientes();
-      }
-    })
-    .catch(err => {
-      console.error('Error:', err);
-      mostrarNotificacion('Error de conexión', 'error');
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
       cargarPacientes();
-    });
+      mostrarNotificacion('Estado actualizado correctamente', 'success');
+    } else {
+      mostrarNotificacion('Error al actualizar estado', 'error');
+      cargarPacientes();
+    }
+  })
+  .catch(err => {
+    console.error('Error:', err);
+    mostrarNotificacion('Error de conexión', 'error');
+    cargarPacientes();
+  });
 }
 
-// MODAL INSERTAR
+// ========== MODALES ==========
 function abrirModalInsertar() {
   document.getElementById('modalInsertar').style.display = 'flex';
   cargarPacientesDisponibles();
@@ -272,12 +310,7 @@ function cerrarModalInsertar() {
 
 function cargarPacientesDisponibles() {
   const contenedor = document.getElementById('lista-pacientes-disponibles');
-  contenedor.innerHTML = `
-    <div class="loading">
-      <i class="fas fa-spinner fa-spin"></i>
-      <p>Cargando pacientes...</p>
-    </div>
-  `;
+  contenedor.innerHTML = `<div class="loading"><i class="fas fa-spinner fa-spin"></i><p>Cargando pacientes...</p></div>`;
 
   fetch('/tableros/cirugia/pacientes/disponibles')
     .then(r => r.json())
@@ -320,23 +353,22 @@ function insertarPaciente(identificacion, nombre) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ identificacion, nombre })
   })
-    .then(r => r.json())
-    .then(data => {
-      if (data.success) {
-        cerrarModalInsertar();
-        cargarPacientes();
-        mostrarNotificacion('Paciente agregado correctamente', 'success');
-      } else {
-        mostrarNotificacion(data.error || 'Error al agregar paciente', 'error');
-      }
-    })
-    .catch(err => {
-      console.error('Error:', err);
-      mostrarNotificacion('Error de conexión', 'error');
-    });
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      cerrarModalInsertar();
+      cargarPacientes();
+      mostrarNotificacion('Paciente agregado correctamente', 'success');
+    } else {
+      mostrarNotificacion(data.error || 'Error al agregar paciente', 'error');
+    }
+  })
+  .catch(err => {
+    console.error('Error:', err);
+    mostrarNotificacion('Error de conexión', 'error');
+  });
 }
 
-// MODAL ELIMINAR
 function abrirModalEliminar(identificacion, nombre) {
   identificacionEliminar = identificacion;
   document.getElementById('nombre-eliminar').textContent = nombre;
@@ -357,39 +389,32 @@ function confirmarEliminar() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ identificacion: identificacionEliminar })
   })
-    .then(r => r.json())
-    .then(data => {
-      if (data.success) {
-        cerrarModalEliminar();
-        cargarPacientes();
-        mostrarNotificacion('Paciente eliminado correctamente', 'success');
-      } else {
-        mostrarNotificacion('Error al eliminar paciente', 'error');
-      }
-    })
-    .catch(err => {
-      console.error('Error:', err);
-      mostrarNotificacion('Error de conexión', 'error');
-    });
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      cerrarModalEliminar();
+      cargarPacientes();
+      mostrarNotificacion('Paciente eliminado correctamente', 'success');
+    } else {
+      mostrarNotificacion('Error al eliminar paciente', 'error');
+    }
+  })
+  .catch(err => {
+    console.error('Error:', err);
+    mostrarNotificacion('Error de conexión', 'error');
+  });
 }
 
-// BÚSQUEDA
+// ========== BÚSQUEDA ==========
 document.addEventListener('DOMContentLoaded', () => {
   const buscarInput = document.getElementById('buscar-paciente');
   if (buscarInput) {
     buscarInput.addEventListener('input', (e) => {
       const texto = e.target.value.toLowerCase();
-      const tarjetas = document.querySelectorAll('.paciente-tarjeta');
-
-      tarjetas.forEach(tarjeta => {
+      document.querySelectorAll('.paciente-tarjeta').forEach(tarjeta => {
         const nombre = tarjeta.querySelector('.paciente-nombre').textContent.toLowerCase();
         const id = tarjeta.dataset.id.toLowerCase();
-
-        if (nombre.includes(texto) || id.includes(texto)) {
-          tarjeta.style.display = 'block';
-        } else {
-          tarjeta.style.display = 'none';
-        }
+        tarjeta.style.display = (nombre.includes(texto) || id.includes(texto)) ? 'block' : 'none';
       });
     });
   }
@@ -398,50 +423,32 @@ document.addEventListener('DOMContentLoaded', () => {
   if (buscarModalInput) {
     buscarModalInput.addEventListener('input', (e) => {
       const texto = e.target.value.toLowerCase();
-      const items = document.querySelectorAll('.paciente-disponible');
-
-      items.forEach(item => {
+      document.querySelectorAll('.paciente-disponible').forEach(item => {
         const nombre = item.querySelector('.paciente-disponible-nombre').textContent.toLowerCase();
         const id = item.querySelector('.paciente-disponible-id').textContent.toLowerCase();
-
-        if (nombre.includes(texto) || id.includes(texto)) {
-          item.style.display = 'block';
-        } else {
-          item.style.display = 'none';
-        }
+        item.style.display = (nombre.includes(texto) || id.includes(texto)) ? 'block' : 'none';
       });
     });
   }
 
-  // Cargar pacientes al iniciar
   cargarPacientes();
-  setInterval(cargarPacientes, 5000);
+  setInterval(cargarPacientes, CONFIG_TABLERO.INTERVALO_ACTUALIZACION);
 });
 
-// NOTIFICACIONES
+// ========== NOTIFICACIONES ==========
 function mostrarNotificacion(mensaje, tipo) {
   const notif = document.createElement('div');
   notif.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    padding: 15px 20px;
+    position: fixed; top: 20px; right: 20px; padding: 15px 20px;
     background: ${tipo === 'success' ? '#4CAF50' : '#f44336'};
-    color: white;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-    z-index: 10000;
-    animation: slideInRight 0.3s;
-    display: flex;
-    align-items: center;
-    gap: 10px;
+    color: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    z-index: 10000; animation: slideInRight 0.3s; display: flex;
+    align-items: center; gap: 10px;
   `;
-
   notif.innerHTML = `
     <i class="fas fa-${tipo === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
     ${mensaje}
   `;
-
   document.body.appendChild(notif);
 
   setTimeout(() => {
@@ -450,7 +457,7 @@ function mostrarNotificacion(mensaje, tipo) {
   }, 3000);
 }
 
-// ACTUALIZAR HORA
+// ========== ACTUALIZAR HORA ==========
 function actualizarHora() {
   const ahora = new Date();
   const hora = ahora.toLocaleTimeString('es-CO', {
@@ -459,9 +466,5 @@ function actualizarHora() {
     second: '2-digit'
   });
   const horaElement = document.getElementById('hora-actualizacion');
-  if (horaElement) {
-    horaElement.textContent = hora;
-  }
+  if (horaElement) horaElement.textContent = hora;
 }
-
-

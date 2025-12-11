@@ -14,52 +14,68 @@ import secrets
 import time
 from . import tableros_bp
 
+
 # Cargar variables de entorno
 load_dotenv()
+
 
 api_key = os.getenv("GOOGLE_API_KEY")
 if not api_key:
     raise ValueError("⚠️ No se encontró GOOGLE_API_KEY en .env")
 
+
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel("gemini-2.5-flash")
 
+
 fecha_actual = datetime.now().strftime('%Y-%m-%d')
+
 
 # Diccionario temporal para almacenar tokens (en producción usar Redis)
 tokens_validos = {}
 
+
 # ========== RUTAS PRINCIPALES ==========
+
 
 @tableros_bp.route('/cirugia', methods=['GET'])
 def tablero_cir():
     """Renderiza el tablero de Cirugía"""
     return render_template('tableros/tablero_cir.html')
 
+
 @tableros_bp.route('/cirugia/publico', methods=['GET'])
 def tablero_cirugia_publico():
     """Renderiza el tablero público para acompañantes"""
     return render_template('tableros/tablero_cir_pub.html')
 
+
 # ========== API PACIENTES ==========
+
 
 @tableros_bp.route('/cirugia/pacientes', methods=['GET'])
 def obtener_pacientes_cirugia():
-    """API para obtener lista de pacientes que están en el tablero (PACMCIR1)"""
+    """API para obtener lista de pacientes que están en el tablero (PACMCIR1) con info de llamado"""
     try:
         with engine.begin() as conn:
             result = conn.execute(text("""
-                SELECT ciride as id, cirnom as nombre, cirest as estado
+                SELECT ciride as id, cirnom as nombre, cirest as estado, 
+                       llamado, msm_llamado
                 FROM PACMCIR1
                 ORDER BY cirnom ASC
             """))
             
             pacientes = []
             for row in result.mappings().all():
+                # Verificar si llamado es 't', 'T' o '1' (diferentes formas de representar true en Informix)
+                llamado_activo = row.get('llamado') in ('t', 'T', '1', 1, True)
+                
                 pacientes.append({
                     'id': row.get('id'),
                     'nombre': row.get('nombre'),
-                    'estado': row.get('estado')
+                    'estado': row.get('estado'),
+                    'llamado': llamado_activo,
+                    'mensaje_llamado': row.get('msm_llamado') if row.get('msm_llamado') else 'Por favor acérquese a Cirugía'
                 })
         
         return jsonify({
@@ -75,6 +91,7 @@ def obtener_pacientes_cirugia():
             "success": False,
             "error": str(e)
         }), 500
+
 
 @tableros_bp.route('/cirugia/pacientes/disponibles', methods=['GET'])
 def obtener_pacientes_disponibles():
@@ -110,6 +127,7 @@ def obtener_pacientes_disponibles():
             "error": str(e)
         }), 500
 
+
 @tableros_bp.route('/cirugia/pacientes', methods=['POST'])
 def insertar_paciente_cirugia():
     """API para insertar paciente de PACCIR1 a PACMCIR1"""
@@ -118,41 +136,51 @@ def insertar_paciente_cirugia():
         identificacion = data.get("identificacion")
         nombre = data.get("nombre")
 
+
         if not identificacion or not nombre:
             return jsonify({"success": False, "error": "Faltan datos obligatorios"}), 400
+
 
         with engine.begin() as conn:
             result = conn.execute(text("""
                 SELECT 1 FROM PACMCIR1 WHERE ciride = :identificacion
             """), {"identificacion": identificacion})
 
+
             if result.first():
                 return jsonify({"success": False, "error": "El paciente ya está en el tablero"}), 409
 
+
             conn.execute(text("""
-                INSERT INTO PACMCIR1 (ciride, cirnom)
-                VALUES (:identificacion, :nombre)
+                INSERT INTO PACMCIR1 (ciride, cirnom, llamado, msm_llamado)
+                VALUES (:identificacion, :nombre, 'f', 'Por favor acérquese a Cirugía')
             """), {
                 "identificacion": identificacion,
                 "nombre": nombre
             })
 
+
         return jsonify({"success": True, "mensaje": "Paciente insertado correctamente"})
+
 
     except Exception as e:
         print("❌ Error en insertar_paciente_cirugia:")
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
 
+
 @tableros_bp.route('/cirugia/pacientes/estado', methods=['PUT'])
 def actualizar_estado_paciente():
+    """Actualizar estado del paciente (P, Q, R)"""
     try:
         data = request.get_json()
         identificacion = data.get("identificacion")
         nuevo_estado = data.get("estado")
 
+
         if not identificacion or not nuevo_estado:
             return jsonify({"success": False, "error": "Faltan datos obligatorios"}), 400
+
 
         with engine.begin() as conn:
             conn.execute(text("""
@@ -164,21 +192,27 @@ def actualizar_estado_paciente():
                 "identificacion": identificacion
             })
 
+
         return jsonify({"success": True, "mensaje": "Estado actualizado correctamente"})
+
 
     except Exception as e:
         print("❌ Error en actualizar_estado_paciente:")
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
 
+
 @tableros_bp.route('/cirugia/pacientes', methods=['DELETE'])
 def eliminar_paciente_cirugia():
+    """Eliminar paciente del tablero"""
     try:
         data = request.get_json()
         identificacion = data.get("identificacion")
 
+
         if not identificacion:
             return jsonify({"success": False, "error": "Faltan datos obligatorios"}), 400
+
 
         with engine.begin() as conn:
             conn.execute(text("""
@@ -188,14 +222,138 @@ def eliminar_paciente_cirugia():
                 "identificacion": identificacion
             })
 
+
         return jsonify({"success": True, "mensaje": "Paciente eliminado correctamente"})
+
 
     except Exception as e:
         print("❌ Error en eliminar_paciente_cirugia:")
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
 
+
+# ========== SISTEMA DE LLAMADOS ==========
+
+
+@tableros_bp.route('/cirugia/pacientes/llamar', methods=['PUT'])
+def llamar_paciente():
+    """Activar o desactivar llamado visual para un paciente"""
+    try:
+        data = request.get_json()
+        identificacion = data.get("identificacion")
+        llamado = data.get("llamado", True)
+        mensaje = data.get("mensaje", "Por favor acérquese a Cirugía")
+        
+        if not identificacion:
+            return jsonify({"success": False, "error": "Identificación requerida"}), 400
+        
+        # Convertir booleano a 't' o 'f' para Informix
+        llamado_valor = 't' if llamado else 'f'
+        
+        with engine.begin() as conn:
+            conn.execute(text("""
+                UPDATE PACMCIR1 
+                SET llamado = :llamado, msm_llamado = :mensaje
+                WHERE ciride = :identificacion
+            """), {
+                "llamado": llamado_valor,
+                "mensaje": mensaje,
+                "identificacion": identificacion
+            })
+        
+        return jsonify({
+            "success": True, 
+            "mensaje": "Llamado activado" if llamado else "Llamado desactivado"
+        })
+    
+    except Exception as e:
+        print("❌ Error al actualizar llamado:")
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@tableros_bp.route('/cirugia/pacientes/llamar/desactivar-todos', methods=['PUT'])
+def desactivar_todos_llamados():
+    """Desactivar todos los llamados activos"""
+    try:
+        with engine.begin() as conn:
+            result = conn.execute(text("""
+                UPDATE PACMCIR1 
+                SET llamado = 'f'
+                WHERE llamado = 't'
+            """))
+        
+        return jsonify({
+            "success": True, 
+            "mensaje": "Todos los llamados desactivados"
+        })
+    
+    except Exception as e:
+        print("❌ Error al desactivar llamados:")
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@tableros_bp.route('/cirugia/pacientes/llamados-activos', methods=['GET'])
+def obtener_llamados_activos():
+    """Obtener lista de pacientes con llamado activo"""
+    try:
+        with engine.begin() as conn:
+            result = conn.execute(text("""
+                SELECT ciride as id, cirnom as nombre, cirest as estado, msm_llamado
+                FROM PACMCIR1 
+                WHERE llamado = 't'
+                ORDER BY cirnom ASC
+            """))
+            
+            llamados = []
+            for row in result.mappings().all():
+                # Ocultar datos sensibles
+                nombre_oculto = ocultar_nombre(row.get('nombre'))
+                id_oculto = ocultar_id(str(row.get('id')))
+                
+                llamados.append({
+                    'id': id_oculto,
+                    'id_completo': row.get('id'),
+                    'nombre': nombre_oculto,
+                    'nombre_completo': row.get('nombre'),
+                    'estado': row.get('estado'),
+                    'mensaje': row.get('msm_llamado') if row.get('msm_llamado') else 'Por favor acérquese a Cirugía'
+                })
+        
+        return jsonify({"success": True, "llamados": llamados})
+    
+    except Exception as e:
+        print("❌ Error al obtener llamados activos:")
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# ========== FUNCIONES AUXILIARES ==========
+
+
+def ocultar_nombre(nombre):
+    """Ocultar partes del nombre con asteriscos"""
+    if not nombre:
+        return "***"
+    
+    partes = str(nombre).strip().split()
+    return ' '.join([p[:3] + '***' if len(p) > 3 else p + '***' for p in partes])
+
+
+def ocultar_id(identificacion):
+    """Ocultar parte del ID"""
+    if not identificacion:
+        return "****"
+    
+    identificacion_str = str(identificacion).strip()
+    if len(identificacion_str) > 4:
+        return identificacion_str[:-4] + '****'
+    return '****'
+
+
 # ========== SISTEMA QR CON TOKENS ==========
+
 
 @tableros_bp.route('/cirugia/generar-qr/<identificacion>', methods=['GET'])
 def generar_qr_paciente(identificacion):
@@ -248,6 +406,7 @@ def generar_qr_paciente(identificacion):
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
 
+
 @tableros_bp.route('/cirugia/paciente/<identificacion>', methods=['GET'])
 def vista_paciente_personalizada(identificacion):
     """Muestra la vista personalizada con validación automática si hay token"""
@@ -275,6 +434,7 @@ def vista_paciente_personalizada(identificacion):
         token=token if tiene_token_valido else None,
         acceso_automatico=tiene_token_valido
     )
+
 
 @tableros_bp.route('/cirugia/paciente/validar', methods=['POST'])
 def validar_acceso_paciente():
@@ -350,6 +510,7 @@ def validar_acceso_paciente():
         print(f"❌ Error al validar acceso: {e}")
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
+
 
 @tableros_bp.route('/cirugia/limpiar-tokens', methods=['POST'])
 def limpiar_tokens_expirados():

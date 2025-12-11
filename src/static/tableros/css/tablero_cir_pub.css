@@ -539,3 +539,212 @@ body {
         flex-direction :column;
     }
 }
+
+/* ========== MODAL DE ALERTA DE LLAMADO ========== */
+
+/* Modal overlay */
+.modal-llamado-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 9999;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Contenido del modal */
+.modal-llamado-content {
+  background: white;
+  border-radius: 24px;
+  padding: 3rem;
+  max-width: 800px;
+  width: 90%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: pulsar-modal 2s ease-in-out infinite;
+  border: 5px solid #28a745;
+}
+
+@keyframes pulsar-modal {
+  0%, 100% {
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 0 0 0 0 rgba(40, 167, 69, 0.7);
+    border-color: #28a745;
+  }
+  50% {
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 0 0 40px 10px rgba(40, 167, 69, 0);
+    border-color: #20c997;
+  }
+}
+
+/* Header con campana */
+.alerta-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.alerta-icono {
+  font-size: 4rem;
+  color: #28a745;
+  animation: sacudir-campana 0.5s ease-in-out infinite;
+  margin-bottom: 1rem;
+  display: block;
+}
+
+@keyframes sacudir-campana {
+  0%, 100% { transform: rotate(0deg); }
+  10%, 30% { transform: rotate(-15deg); }
+  20%, 40% { transform: rotate(15deg); }
+  50% { transform: rotate(0deg); }
+}
+
+.alerta-header h2 {
+  font-size: 2.5rem;
+  color: #28a745;
+  margin: 0;
+  font-weight: 700;
+}
+
+/* Tarjeta del paciente ampliada */
+.paciente-llamado-card {
+  background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+  border-radius: 16px;
+  padding: 2.5rem;
+  margin: 2rem 0;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.1);
+  animation: pulsar-card 1.5s ease-in-out infinite;
+}
+
+@keyframes pulsar-card {
+  0%, 100% {
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+  }
+  50% {
+    background: linear-gradient(135deg, #c3e6cb 0%, #a8d5ba 100%);
+  }
+}
+
+.paciente-id-grande,
+.paciente-nombre-grande {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  margin: 1rem 0;
+}
+
+.paciente-id-grande i,
+.paciente-nombre-grande i {
+  font-size: 2rem;
+  color: #155724;
+}
+
+.paciente-id-grande span {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #155724;
+  font-family: 'Courier New', monospace;
+}
+
+.paciente-nombre-grande span {
+  font-size: 2rem;
+  font-weight: 600;
+  color: #155724;
+  text-transform: uppercase;
+}
+
+/* Mensaje de llamado */
+.mensaje-llamado {
+  text-align: center;
+  background: #fff3cd;
+  border: 3px solid #ffc107;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin: 2rem 0;
+}
+
+.mensaje-llamado p {
+  font-size: 1.8rem;
+  color: #856404;
+  margin: 0;
+  font-weight: 600;
+}
+
+.mensaje-llamado strong {
+  color: #d63384;
+  font-size: 2rem;
+}
+
+/* Temporizador */
+.temporizador-llamado {
+  text-align: center;
+  margin-top: 2rem;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 12px;
+  background: #e9ecef;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
+  width: 100%;
+  transition: width 0.1s linear;
+}
+
+.temporizador-llamado p {
+  font-size: 1.2rem;
+  color: #6c757d;
+  margin: 0;
+}
+
+#segundos-restantes {
+  font-weight: 700;
+  color: #28a745;
+  font-size: 1.4rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .modal-llamado-content {
+    padding: 2rem;
+    width: 95%;
+  }
+  
+  .alerta-icono {
+    font-size: 3rem;
+  }
+  
+  .alerta-header h2 {
+    font-size: 2rem;
+  }
+  
+  .paciente-id-grande span {
+    font-size: 2rem;
+  }
+  
+  .paciente-nombre-grande span {
+    font-size: 1.5rem;
+  }
+  
+  .mensaje-llamado p {
+    font-size: 1.4rem;
+  }
+  
+  .mensaje-llamado strong {
+    font-size: 1.6rem;
+  }
+}

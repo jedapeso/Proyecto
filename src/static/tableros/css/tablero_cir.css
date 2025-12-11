@@ -162,6 +162,8 @@ body {
     box-shadow: var(--shadow-sm);
     transition: all 0.3s;
     border-left: 4px solid;
+    position: relative;
+    overflow: visible;
 }
 
 .stat-card:hover {
@@ -245,7 +247,7 @@ body {
     min-height: 600px;
 }
 
-/* ========== HEADERS DE COLUMNAS (MÁS DELGADOS, SIN BADGE) ========== */
+/* ========== HEADERS DE COLUMNAS ========== */
 .columna-header {
     padding: 15px 20px;
     color: white;
@@ -277,7 +279,6 @@ body {
     margin: 0;
 }
 
-/* Ocultar badges (ya no se usan) */
 .contador-badge,
 .header-info {
     display: none;
@@ -359,9 +360,11 @@ body {
     color: var(--color-primary);
 }
 
-.paciente-acciones {
+/* ========== ACCIONES CON TOGGLE SWITCH MEJORADO ========== */
+.acciones-paciente {
     display: flex;
-    gap: 5px;
+    gap: 12px;
+    align-items: center;
 }
 
 .btn-icon {
@@ -378,9 +381,132 @@ body {
     background: rgba(0, 0, 0, 0.05);
 }
 
+.btn-icon.eliminar {
+    background-color: #dc3545;
+    color: white;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+}
+
 .btn-icon.eliminar:hover {
-    background: rgba(244, 67, 54, 0.1);
-    color: var(--color-danger);
+    background-color: #c82333;
+    transform: scale(1.1);
+}
+
+/* ========== TOGGLE SWITCH MEJORADO (Campana a la izquierda, sin texto) ========== */
+.toggle-llamado-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Icono de campana al lado izquierdo del toggle */
+.toggle-bell-icon {
+    font-size: 16px;
+    color: #6c757d;
+    transition: all 0.3s ease;
+}
+
+/* Toggle Switch Base */
+.toggle-llamado {
+    position: relative;
+    display: inline-block;
+    width: 42px;
+    height: 22px;
+    cursor: pointer;
+}
+
+.toggle-llamado.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.toggle-llamado input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-llamado input:disabled {
+    cursor: not-allowed;
+}
+
+/* Slider del Toggle - SIN TEXTO OFF/ON */
+.toggle-slider {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    border-radius: 22px;
+    transition: all 0.3s ease;
+}
+
+/* Botón circular del Toggle */
+.toggle-slider::before {
+    content: '';
+    position: absolute;
+    height: 16px;
+    width: 16px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    border-radius: 50%;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+/* Estado CHECKED (Activo) - Toggle verde pulsante */
+.toggle-llamado input:checked + .toggle-slider {
+    background-color: #28a745;
+    animation: pulsar-toggle 1.5s ease-in-out infinite;
+}
+
+.toggle-llamado input:checked + .toggle-slider::before {
+    transform: translateX(20px);
+}
+
+/* Campana verde animada cuando está activo */
+.toggle-llamado-container:has(input:checked) .toggle-bell-icon {
+    color: #28a745;
+    animation: sacudir-campana 0.5s ease-in-out infinite;
+}
+
+@keyframes sacudir-campana {
+    0%, 100% { transform: rotate(0deg); }
+    10%, 30% { transform: rotate(-15deg); }
+    20%, 40% { transform: rotate(15deg); }
+    50% { transform: rotate(0deg); }
+}
+
+/* Animación de pulso cuando está activo */
+@keyframes pulsar-toggle {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7);
+    }
+    50% {
+        box-shadow: 0 0 0 6px rgba(40, 167, 69, 0);
+    }
+}
+
+/* Hover effect */
+.toggle-llamado:not(.disabled):hover .toggle-slider {
+    opacity: 0.9;
+}
+
+.toggle-llamado.disabled:hover .toggle-slider {
+    opacity: 0.4;
+}
+
+/* Ocultar label de texto si existe */
+.toggle-label {
+    display: none;
 }
 
 .paciente-nombre {
@@ -610,31 +736,6 @@ body {
     box-shadow: 0 0 8px var(--color-success);
 }
 
-/* ========== RESPONSIVE ========== */
-@media (max-width: 1200px) {
-    .tablero-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    .stats-bar {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
-@media (max-width: 768px) {
-    .header-content {
-        flex-direction: column;
-        gap: 15px;
-    }
-    
-    .search-box input {
-        width: 100%;
-    }
-    
-    .stats-bar {
-        grid-template-columns: 1fr;
-    }
-}
 /* ========== ESTILOS FALTANTES PARA MODALES ========== */
 .search-paciente {
     margin-bottom: 20px;
@@ -693,6 +794,7 @@ body {
     font-size: 13px;
     color: var(--text-light);
 }
+
 /* ========== CONTADOR COMPACTO EN HEADERS ========== */
 .contador {
     background: rgba(255, 255, 255, 0.25);
@@ -708,25 +810,17 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
-/* Animación suave cuando cambia el número */
 @keyframes pulse {
-    0% {
-        transform: scale(1);
-    }
-    50% {
-        transform: scale(1.15);
-    }
-    100% {
-        transform: scale(1);
-    }
+    0% { transform: scale(1); }
+    50% { transform: scale(1.15); }
+    100% { transform: scale(1); }
 }
 
 .contador.updated {
     animation: pulse 0.4s ease-in-out;
 }
-/* ========== ALERTAS DE CAPACIDAD ========== */
 
-/* Tarjeta con capacidad excedida */
+/* ========== ALERTAS DE CAPACIDAD ========== */
 .stat-card.capacidad-excedida {
     background: linear-gradient(135deg, #ef4444, #dc2626) !important;
     color: white !important;
@@ -741,7 +835,6 @@ body {
     color: white !important;
 }
 
-/* Tarjeta cerca del límite */
 .stat-card.capacidad-advertencia {
     background: linear-gradient(135deg, #f59e0b, #d97706) !important;
     color: white !important;
@@ -755,7 +848,6 @@ body {
     color: white !important;
 }
 
-/* Animación de pulso para alerta */
 @keyframes pulsoAlerta {
     0%, 100% { 
         opacity: 1;
@@ -767,7 +859,6 @@ body {
     }
 }
 
-/* Icono de alerta titilante */
 .icono-alerta {
     display: inline-block;
     margin-left: 6px;
@@ -789,7 +880,6 @@ body {
     50% { opacity: 0.4; }
 }
 
-/* Tooltip de capacidad - en la esquina derecha */
 .tooltip-capacidad {
     position: absolute;
     top: 50%;
@@ -809,7 +899,6 @@ body {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-/* Sin flecha ya que está al lado */
 .tooltip-capacidad::after {
     display: none;
 }
@@ -817,11 +906,52 @@ body {
 .stat-card:hover .tooltip-capacidad {
     opacity: 1;
     transform: translateY(-50%) scale(1);
-    right: 12px;  /* se acerca un poco al hacer hover */
+    right: 12px;
 }
 
-/* Asegurar que stat-card tenga position relative */
-.stat-card {
-    position: relative;
-    overflow: visible;
+/* ========== RESPONSIVE ========== */
+@media (max-width: 1200px) {
+    .tablero-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .stats-bar {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .header-content {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .search-box input {
+        width: 100%;
+    }
+    
+    .stats-bar {
+        grid-template-columns: 1fr;
+    }
+
+    /* Toggle responsive */
+    .toggle-llamado {
+        width: 38px;
+        height: 20px;
+    }
+
+    .toggle-slider::before {
+        height: 14px;
+        width: 14px;
+        left: 3px;
+        bottom: 3px;
+    }
+
+    .toggle-llamado input:checked + .toggle-slider::before {
+        transform: translateX(18px);
+    }
+
+    .toggle-bell-icon {
+        font-size: 14px;
+    }
 }

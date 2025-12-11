@@ -15,7 +15,7 @@
                 <i class="fas fa-hospital-alt"></i>
                 <div class="header-text">
                     <h1>Seguimiento Quirúrgico Ubicación del paciente en tiempo real</h1>
-                     <span class="header-translation">Real-time Patient Tracking</span>
+                    <span class="header-translation">Real-time Patient Tracking</span>
                 </div>
             </div>
             <div class="update-info">
@@ -26,7 +26,6 @@
             </div>
         </div>
     </header>
-
 
     <!-- Contenedor Principal -->
     <main class="main-content">
@@ -47,7 +46,6 @@
                 </div>
             </div>
 
-
             <!-- Columna Quirófano -->
             <div class="columna-estado" data-estado="quirofano">
                 <div class="columna-header quirofano">
@@ -63,7 +61,6 @@
                     <!-- Se llena dinámicamente -->
                 </div>
             </div>
-
 
             <!-- Columna Recuperación -->
             <div class="columna-estado" data-estado="recuperacion">
@@ -83,7 +80,6 @@
         </div>
     </main>
 
-
     <!-- Modal para ingresar clave -->
     <div id="modalClave" class="modal-overlay" style="display: none;">
         <div class="modal-clave">
@@ -102,7 +98,6 @@
             <p id="errorClave" class="error-mensaje"></p>
         </div>
     </div>
-
 
     <!-- Modal para mostrar QR -->
     <div id="modalQR" class="modal-overlay" style="display: none;">
@@ -129,6 +124,44 @@
         </div>
     </div>
 
+    <!-- Modal de alerta de llamado -->
+    <div id="modal-llamado" class="modal-llamado-overlay" style="display: none;">
+        <div class="modal-llamado-content">
+            <div class="alerta-header">
+                <i class="fas fa-bell alerta-icono"></i>
+                <h2>Llamado de Paciente</h2>
+            </div>
+            
+            <div class="paciente-llamado-card">
+                <div class="paciente-id-grande">
+                    <i class="fas fa-id-card"></i>
+                    <span id="llamado-id"></span>
+                </div>
+                <div class="paciente-nombre-grande">
+                    <i class="fas fa-user"></i>
+                    <span id="llamado-nombre"></span>
+                </div>
+            </div>
+            
+            <div class="mensaje-llamado">
+                <p id="mensaje-texto">Por favor diríjase a <strong id="area-llamado"></strong></p>
+            </div>
+            
+            <div class="temporizador-llamado">
+                <div class="progress-bar">
+                    <div id="progress-fill" class="progress-fill"></div>
+                </div>
+                <p>Esta alerta se cerrará en <span id="segundos-restantes">20</span> segundos</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Aviso de permisos -->
+    <div id="aviso-notificaciones" class="alerta-permisos" style="display: none;">
+        <i class="fas fa-bell"></i>
+        <p>Para recibir alertas de llamado, habilite las notificaciones del navegador</p>
+        <button onclick="solicitarPermisoNotificaciones()">Habilitar Notificaciones</button>
+    </div>
 
     <!-- Footer -->
     <footer class="footer-info">
@@ -140,7 +173,9 @@
         </div>
     </footer>
 
-
+    <!-- Cargar CONFIG primero -->
+    <script src="{{ url_for('static', filename='tableros/js/config_tablero.js') }}"></script>
+    <!-- Luego el script público -->
     <script src="{{ url_for('static', filename='tableros/js/tablero_cir_pub.js') }}"></script>
 </body>
 </html>
