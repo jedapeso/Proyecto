@@ -13,8 +13,7 @@ const CONFIG_TABLERO = {
     
     // Control de audio
     audioPreparado: false,
-    audioElement: null,       // Para sonido fuerte (TV)
-    audioSutilElement: null   // Para sonido suave (Celular)
+    audioElement: null
 };
 
 // Convertir letra de estado a descripción
@@ -47,88 +46,99 @@ CONFIG_TABLERO.prepararAudio = function() {
     if (this.audioPreparado) return;
     
     try {
-        // AUDIO 1: Fuerte (TV/Sala)
+        // Crear elemento de audio vacío y prepararlo
         this.audioElement = new Audio();
-        // Tono de alerta corto (tu base64 original)
+        
+        // Datos de audio en base64 (tono de alerta corto)
         const audioData = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIGWm98OScTgwOU6nh77ViHAU7k9r0y3krBSJ2yPDej0EKElyw6Omp';
+        
         this.audioElement.src = audioData;
-        this.audioElement.volume = 0.8;
+        this.audioElement.volume = 0.7;
         this.audioElement.load();
         
-        // AUDIO 2: Sutil (Celular) - Tono suave tipo notificación
-        this.audioSutilElement = new Audio();
-        // Base64 de un "ding" suave y agradable
-        const audioSutilData = 'data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YUoNAACBiYqJdG1vbICPmJ+blYl/d2tqbXR6gIaPl5qXko2Ih4SEhYaIi42OjoqHhYSEhYeKjI2NjImGhIODhIeJi4uLioaEgoGBgoSHiYmIh4WEg4KChISGh4iIiIeFhIOCgoKDhYaHh4eGhIOCgoKCg4SFhoaGhYSDgoGBgoOEhYWFhYWEg4KBgYGChIOEhISEhIODgoGBgYGChIODg4ODg4OCgYGAgICBgoKCgoKCgoGBgYCAgICBgoGBgYGBgQAAAAA=';
-        this.audioSutilElement.src = audioSutilData;
-        this.audioSutilElement.volume = 0.3; // Volumen bajo para no asustar
-        this.audioSutilElement.load();
-
         this.audioPreparado = true;
-        console.log('✅ Audios preparados correctamente (Fuerte y Sutil)');
+        console.log('✅ Audio preparado correctamente');
     } catch (e) {
         console.error('❌ Error al preparar audio:', e);
     }
 };
 
-// 🔊 Reproducir sonido (Soporta modos: 'normal' o 'sutil')
-CONFIG_TABLERO.reproducirSonido = function(modo = 'normal') {
-    let exito = false;
+// 🔊 Reproducir sonido (múltiples métodos)
+CONFIG_TABLERO.reproducirSonido = function() {
+    let exitoMetodo1 = false;
+    let exitoMetodo2 = false;
+    let exitoMetodo3 = false;
     
-    // Si piden modo SUTIL (para celular)
-    if (modo === 'sutil' && this.audioSutilElement) {
-        try {
-            this.audioSutilElement.currentTime = 0;
-            this.audioSutilElement.play()
-                .then(() => console.log('🔊 Audio Sutil: Exitoso'))
-                .catch(e => console.warn('⚠️ Audio Sutil bloqueado (falta interacción):', e));
-            return true;
-        } catch (e) { console.warn('Fallo audio sutil HTML5'); }
-    }
-
-    // Si es modo NORMAL o falló el sutil, usamos el método robusto original
-    if (modo === 'normal') {
-        // MÉTODO 1: Audio Element
-        try {
-            if (this.audioElement) {
-                this.audioElement.currentTime = 0;
-                this.audioElement.play()
-                    .then(() => { console.log('🔊 Audio Normal: Exitoso'); exito = true; })
-                    .catch(err => console.warn('⚠️ Audio Normal bloqueado:', err.message));
+    // MÉTODO 1: Audio Element (más confiable)
+    try {
+        if (this.audioElement) {
+            this.audioElement.currentTime = 0;
+            const promise = this.audioElement.play();
+            
+            if (promise !== undefined) {
+                promise
+                    .then(() => {
+                        console.log('🔊 Método 1 (Audio): Exitoso');
+                        exitoMetodo1 = true;
+                    })
+                    .catch(err => {
+                        console.warn('⚠️ Método 1 (Audio): Fallido -', err.message);
+                    });
             }
-        } catch (e) { console.warn('⚠️ Error audio element:', e); }
+        }
+    } catch (e) {
+        console.warn('⚠️ Método 1: Error -', e.message);
+    }
+    
+    // MÉTODO 2: Web Audio API (respaldo)
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         
-        // Si ya tuvo éxito, retornamos. Si no, probamos Web Audio API como respaldo
-        if (exito) return true;
-
-        // MÉTODO 2: Web Audio API (Respaldo)
-        try {
-            const AudioContext = window.AudioContext || window.webkitAudioContext;
-            if (AudioContext) {
-                const ctx = new AudioContext();
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-                
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-                
-                // Configurar tono según modo
-                if (modo === 'sutil') {
-                    osc.frequency.value = 600; // Tono más grave/suave
-                    gain.gain.value = 0.1;     // Volumen muy bajo
-                } else {
-                    osc.frequency.value = 880; // Tono agudo alerta
-                    gain.gain.value = 0.3;     // Volumen medio
-                }
-
-                osc.start();
-                osc.stop(ctx.currentTime + 0.3);
-                console.log('🔊 WebAudio Backup: Exitoso');
-                return true;
-            }
-        } catch (e) { console.warn('⚠️ WebAudio falló:', e); }
+        if (audioContext.state === 'suspended') {
+            audioContext.resume();
+        }
+        
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.value = 880; // La5 (más agudo)
+        oscillator.type = 'sine';
+        
+        const now = audioContext.currentTime;
+        gainNode.gain.setValueAtTime(0.4, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+        
+        oscillator.start(now);
+        oscillator.stop(now + 0.4);
+        
+        exitoMetodo2 = true;
+        console.log('🔊 Método 2 (WebAudio): Exitoso');
+        
+    } catch (e) {
+        console.warn('⚠️ Método 2: Error -', e.message);
     }
     
-    return false;
+    // MÉTODO 3: Beep del sistema (último recurso)
+    try {
+        // En algunos navegadores antiguos funciona
+        const beep = new Audio('data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU' + 
+            'oNAACBiYqJdG1vbICPmJ+blYl/d2tqbXR6gIaPl5qXko2Ih4SEhYaIi42OjoqHhYSEhYeKjI2NjImGhIODhIeJi4uLioaEgoGBgoSHiYmIh4WEg4KChISGh4iIiIeFhIOCgoKDhYaHh4eGhIOCgoKCg4SFhoaGhYSDgoGBgoOEhYWFhYWEg4KBgYGChIOEhISEhIODgoGBgYGChIODg4ODg4OCgYGAgICBgoKCgoKCgoGBgYCAgICBgoGBgYGBgQAAAAA=');
+        beep.play();
+        exitoMetodo3 = true;
+        console.log('🔊 Método 3 (Beep): Exitoso');
+    } catch (e) {
+        console.warn('⚠️ Método 3: Error -', e.message);
+    }
+    
+    const exito = exitoMetodo1 || exitoMetodo2 || exitoMetodo3;
+    if (!exito) {
+        console.error('❌ TODOS los métodos de audio fallaron');
+    }
+    
+    return exito;
 };
 
 // Validar capacidad
