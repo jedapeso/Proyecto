@@ -15,6 +15,7 @@ def estadisticas():
     from flask import send_file
     import pandas as pd
     import io
+    import xml.etree.ElementTree as ET
 
     fecha_inicio = request.form.get('fecha_inicio')
     fecha_fin = request.form.get('fecha_fin')
@@ -32,21 +33,25 @@ def estadisticas():
 
             # Diccionario con nombre de hoja y tabla
             tablas = {
-                'POR TIPO ANESTESIA': "CIRTIPANE",
-                'POR EDAD': "CIREDAD",
-                'POR EMPRESA': "CIREMPR",
-                'POR RESPONSABLE': "CIRRESP",
-                'POR ESPECIALIDAD': "CIRESPC",
-                'POR MEDICO': "CIRMEDIC",
-                'POR DURACION': "CIRDURA",
-                'DETALLADO': "CIRDETA",
-                '10 MAS COMUNES': "CIRMASCO",
-                'POR TIEMPO ESPERA': "CIRPROG",
-                'POR TIPO': "CIRTIPO",
-                'RESUMEN': "RESUMEN",
-                'POR REINTERVENCION': "REINTER",
-                'POR COMPLICACION': "CIRCOMPLICA",
-                'OPORTUNIDAD ATENCION': "CIRDATFIN",
+                #'POR TIPO ANESTESIA': "CIRTIPANE",
+                #'POR EDAD': "CIREDAD",
+                #'POR EMPRESA': "CIREMPR",
+                #'POR RESPONSABLE': "CIRRESP",
+                #'POR ESPECIALIDAD': "CIRESPC",
+                #'POR MEDICO': "CIRMEDIC",
+                #'POR DURACION': "CIRDURA",
+                #'DETALLADO': "CIRDETA",
+                #'10 MAS COMUNES': "CIRMASCO",
+                #'POR TIEMPO ESPERA': "CIRPROG",
+                #'POR TIPO': "CIRTIPO",
+                #'RESUMEN': "RESUMEN",
+                #'POR REINTERVENCION': "REINTER",
+                #'POR COMPLICACION': "CIRCOMPLICA",
+                #'OPORTUNIDAD ATENCION': "CIRDATFIN",
+                #'TIEMPO PROMEDIO PROCE': "PROCED1",
+                #'CIRUGIAS TOTALES': "NOPROCED",
+                #'AMBULATORIA Y HOSPITALIZADA': "TIPAC1",
+                'PROFILAXIS ANTIBIOTICA': "PROFIX1",
             }
 
             output = io.BytesIO()
@@ -55,10 +60,19 @@ def estadisticas():
                     try:
                         df = pd.read_sql(f"SELECT * FROM {tabla}", conn)
                         if not df.empty:
+                            # Procesamiento especial para PROFIX1
+                            if tabla == "PROFIX1":
+                                df = procesar_xml_profix(df)
+                            
+                            # Escribir el DataFrame
                             df.to_excel(writer, sheet_name=nombre_hoja[:31], index=False)
+                            
+                            # Ajustar ancho de columnas automáticamente
+                            ajustar_columnas(writer, nombre_hoja[:31], df)
+                            
                     except Exception as e:
                         print(f"⚠️ Error con tabla {tabla}: {e}")
-                        continue  # omite tablas con error
+                        continue
 
         output.seek(0)
         return send_file(
@@ -70,6 +84,108 @@ def estadisticas():
 
     except Exception as e:
         return f"❌ Error al generar reporte de Estadísticas de Cirugía: {e}", 500
+
+
+def ajustar_columnas(writer, sheet_name, df):
+    """
+    Ajusta automáticamente el ancho de las columnas según el contenido
+    """
+    worksheet = writer.sheets[sheet_name]
+    
+    for idx, col in enumerate(df.columns):
+        # Calcular el ancho máximo entre el nombre de la columna y los datos
+        max_len = len(str(col))  # Longitud del encabezado
+        
+        # Revisar el contenido de la columna
+        if len(df[col]) > 0:
+            try:
+                # Obtener la longitud máxima del contenido
+                max_len = max(
+                    df[col].astype(str).map(len).max(),  # Máximo en los datos
+                    max_len  # Comparar con el encabezado
+                )
+            except:
+                pass
+        
+        # Establecer un ancho máximo y mínimo razonable
+        adjusted_width = min(max(max_len + 2, 10), 50)  # Entre 10 y 50 caracteres
+        
+        worksheet.set_column(idx, idx, adjusted_width)
+
+
+def procesar_xml_profix(df):
+    """
+    Extrae el valor (SI/NO/NA) del item 'Administración de profilaxis antibiotica'
+    de la columna VARCLIDES que contiene el XML y omite filas sin valor válido
+    """
+    import xml.etree.ElementTree as ET
+    import pandas as pd
+    
+    # Verificar que existe la columna VARCLIDES (case-insensitive)
+    varclides_col = None
+    for col in df.columns:
+        if col.upper() == 'VARCLIDES':
+            varclides_col = col
+            break
+    
+    if varclides_col is None:
+        print(f"⚠️ No se encontró la columna VARCLIDES")
+        return df
+    
+    def extraer_profilaxis_antibiotica(xml_string):
+        """
+        Busca el Row con ITEM='Administración de profilaxis antibiotica'
+        y extrae su valor (SI/NO/NA)
+        """
+        if pd.isna(xml_string) or not xml_string or str(xml_string).strip() == '':
+            return None
+        
+        try:
+            xml_str = str(xml_string).strip()
+            root = ET.fromstring(xml_str)
+            
+            # Recorrer todos los Row del XML
+            for row in root.findall('.//Row'):
+                item_cell = row.find('.//Cell[@ColumnCode="ITEM"]')
+                
+                if item_cell is not None:
+                    item_value = item_cell.find('Value')
+                    
+                    if item_value is not None and 'profilaxis antibiotica' in item_value.text.lower():
+                        for cell in row.findall('.//Cell'):
+                            column_code = cell.get('ColumnCode')
+                            if column_code in ['SI', 'NO', 'NA']:
+                                value_elem = cell.find('Value')
+                                if value_elem is not None:
+                                    valor = value_elem.text
+                                    if valor == 'S':
+                                        return 'SI'
+                                    elif valor == 'N':
+                                        return 'NO'
+                                    elif valor == 'NA':
+                                        return 'NA'
+                                    else:
+                                        return valor
+            return None
+        except Exception as e:
+            print(f"⚠️ Error parseando XML: {e}")
+            return None
+    
+    # Crear copia y extraer valores
+    df_result = df.copy()
+    df_result['Profilaxis_Antibiotica'] = df_result[varclides_col].apply(extraer_profilaxis_antibiotica)
+    
+    # Filtrar filas sin valor válido
+    df_result = df_result[df_result['Profilaxis_Antibiotica'].notna()]
+    
+    # Eliminar columna VARCLIDES
+    if varclides_col in df_result.columns:
+        df_result = df_result.drop(columns=[varclides_col])
+    
+    print(f"✅ Procesados {len(df_result)} registros con profilaxis antibiótica")
+    
+    return df_result
+
 
 #PROGRAMACION DE TURNOS
 @cirugia_bp.route('/programacion-turnos-excel', methods=['POST'])

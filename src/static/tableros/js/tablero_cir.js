@@ -468,3 +468,5 @@ function actualizarHora() {
   const horaElement = document.getElementById('hora-actualizacion');
   if (horaElement) horaElement.textContent = hora;
 }
+
+

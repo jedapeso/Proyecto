@@ -454,8 +454,9 @@ def validar_acceso_paciente():
                 if datos_token['identificacion'] == identificacion:
                     # Token válido, obtener datos
                     with engine.begin() as conn:
+                        # [CORRECCIÓN] Agregamos 'llamado' a la consulta SQL
                         result = conn.execute(text("""
-                            SELECT ciride as id, cirnom as nombre, cirest as estado
+                            SELECT ciride as id, cirnom as nombre, cirest as estado, llamado
                             FROM PACMCIR1
                             WHERE ciride = :identificacion
                         """), {"identificacion": identificacion})
@@ -470,7 +471,9 @@ def validar_acceso_paciente():
                             "paciente": {
                                 "identificacion": paciente['id'],
                                 "nombre": paciente['nombre'],
-                                "estado": paciente['estado']
+                                "estado": paciente['estado'],
+                                # [CORRECCIÓN] Agregamos 'llamado' al JSON
+                                "llamado": bool(paciente['llamado']) if paciente['llamado'] else False
                             }
                         })
             else:
@@ -484,8 +487,9 @@ def validar_acceso_paciente():
                 return jsonify({"success": False, "error": "Clave incorrecta"}), 401
             
             with engine.begin() as conn:
+                # [CORRECCIÓN] Agregamos 'llamado' a la consulta SQL
                 result = conn.execute(text("""
-                    SELECT ciride as id, cirnom as nombre, cirest as estado
+                    SELECT ciride as id, cirnom as nombre, cirest as estado, llamado
                     FROM PACMCIR1
                     WHERE ciride = :identificacion
                 """), {"identificacion": identificacion})
@@ -500,7 +504,9 @@ def validar_acceso_paciente():
                     "paciente": {
                         "identificacion": paciente['id'],
                         "nombre": paciente['nombre'],
-                        "estado": paciente['estado']
+                        "estado": paciente['estado'],
+                        # [CORRECCIÓN] Agregamos 'llamado' al JSON
+                        "llamado": bool(paciente['llamado']) if paciente['llamado'] else False
                     }
                 })
         
@@ -535,3 +541,4 @@ def limpiar_tokens_expirados():
     
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+

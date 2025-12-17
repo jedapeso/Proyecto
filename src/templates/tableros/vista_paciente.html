@@ -8,99 +8,122 @@
   <title>Ubicación de Paciente - Clínica del Caribe</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='tableros/css/vista_paciente.css') }}">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
 </head>
 <body>
+
+<!-- CORREGIDO: ID 'zonaAlerta' y display: none explícito -->
+<div id="zonaAlerta" class="vp-alerta-top" style="display: none;">
+    <div class="vp-alerta-icon-box">
+        <i class="fas fa-bullhorn"></i>
+    </div>
+    <div class="vp-alerta-mensaje">
+        <h3>¡ATENCIÓN! / ATTENTION!</h3>
+        <p>Por favor acérquese al módulo de atención.</p>
+        <small>Please approach the reception desk.</small>
+    </div>
+</div>
+
   <div class="vp-container">
-    <header class="vp-header">
-      <h1>Ubicación del Paciente</h1>
-      <p class="vp-header-sub">Patient Location</p>
-    </header>
+    
+    <!-- HEADER -->
+    <div class="vp-header">
+      <h1>Estado del Paciente</h1>
+      <p class="vp-header-sub">Seguimiento en tiempo real</p>
+    </div>
 
+    <!-- CARD PRINCIPAL -->
+    <div class="vp-card">
 
-    <!-- Formulario de clave (si NO hay token) -->
-    <section id="formulario-acceso"
-             class="vp-card vp-formulario"
-             style="display: {% if acceso_automatico %}none{% else %}block{% endif %};">
-      <h2>Ingrese la clave de acceso</h2>
-      <p>Últimos 4 dígitos de la identificación</p>
-      <input type="tel"
-             id="clave"
-             maxlength="4"
-             placeholder="****"
-             class="vp-input-clave"
-             autocomplete="off">
-      <button onclick="validarAcceso()" class="vp-btn">
-        Acceder
-      </button>
-      <div id="error-mensaje" class="vp-error"></div>
-    </section>
-
-    <section 
-        id="loader">
-    </section>
-
-    <!-- Datos del paciente -->
-    <section id="datos-paciente" class="vp-card vp-datos" style="display:none;">
-      <!-- Tarjeta de estado tipo panel -->
-    <div id="estadoVisual" class="vp-estado">
-        <div class="vp-estado-header">
-            <div class="vp-estado-icon-wrapper">
-            <i id="iconoEstado" class="fas fa-bed vp-icono-estado"></i>
-            </div>
-            <div class="vp-estado-textos">
-            <span id="nombreEstadoES" class="vp-estado-es"></span>
-            <span id="nombreEstadoEN" class="vp-estado-en"></span>
-            </div>
-        </div>
-     </div>
-
-     <!-- Info paciente con iconos -->
-  <!-- Info paciente con iconos Font Awesome -->
-        <div class="vp-info">
-        <p>
-            <span class="vp-info-label">
-            <i class="fa-regular fa-id-card vp-info-icon-fa"></i>
-            </span>
-            <span id="pacienteID"></span>
-        </p>
-        <p>
-            <span class="vp-info-label">
-            <i class="fa-regular fa-user vp-info-icon-fa"></i>
-            </span>
-            <span id="pacienteNombre"></span>
-        </p>
-        </div>
-
-      <!-- Mensaje de Recuperación -->
-      <div id="mensajeRecuperacion" class="vp-mensaje-recuperacion" style="display:none;">
-        <div class="vp-mensaje-header">
-        </div>
-        <div class="vp-mensaje-body">
-          <p>Su familiar se encuentra en recuperación. Por favor, permanezca en la sala de espera; nuestro equipo le avisará cuando sea el momento de pasar.</p>
-          <p>Gracias por su comprensión.</p>
-        </div>
-        <div class="vp-mensaje-footer">
-          <p>Your family member is in recovery. Please remain in the waiting room; our team will notify you when it's time to come in.</p>
-          <p>Thank you for your understanding.</p>
-        </div>
+      <!-- FORMULARIO DE ACCESO -->
+      <div id="formulario-acceso" class="vp-formulario">
+        <h2>Ingrese la Clave de Acceso</h2>
+        <p>Utilice los 4 dígitos entregados en admisión</p>
+        
+        <input type="tel" 
+               id="clave" 
+               class="vp-input-clave" 
+               maxlength="4" 
+               placeholder="••••" 
+               autocomplete="off"
+               inputmode="numeric">
+        
+        <button class="vp-btn" onclick="validarAcceso()">
+          CONSULTAR ESTADO
+        </button>
+        
+        <div id="error-mensaje" class="vp-error"></div>
       </div>
 
-      <p class="vp-actualizacion">
-        Última actualización: <span id="horaActualizacion"></span>
-      </p>
-    </section>
+      <!-- LOADER -->
+      <div id="loader" class="vp-loader" style="display: none;">
+        <div class="vp-spinner"></div>
+        <p class="vp-loader-text">Verificando información...</p>
+      </div>
+
+      <!-- DATOS DEL PACIENTE -->
+      <div id="datos-paciente" class="vp-datos" style="display: none;">
+        
+        <!-- Tarjeta de Estado -->
+        <div id="estadoVisual" class="vp-estado">
+          <div class="vp-estado-header">
+            <div class="vp-estado-icon-wrapper">
+              <i id="iconoEstado" class="fas fa-question-circle vp-icono-estado"></i>
+            </div>
+            <div class="vp-estado-textos">
+              <span id="nombreEstadoES" class="vp-estado-es">CARGANDO...</span>
+              <span id="nombreEstadoEN" class="vp-estado-en">Loading...</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Info Paciente -->
+        <div class="vp-info">
+          <p class="vp-info-row">
+            <span class="vp-info-label">
+              <i class="fas fa-user-circle vp-info-icon-fa"></i>
+              Paciente:
+            </span>
+            <span id="pacienteNombre">...</span>
+          </p>
+          <p class="vp-info-row">
+            <span class="vp-info-label">
+              <i class="fas fa-id-card vp-info-icon-fa"></i>
+              ID:
+            </span>
+            <span id="pacienteID">...</span>
+          </p>
+        </div>
+
+        <!-- Mensaje Recuperación -->
+        <div id="mensajeRecuperacion" class="vp-mensaje-recuperacion" style="display: none;">
+          <div class="vp-mensaje-header">
+            <i class="fas fa-info-circle"></i>
+            <h3>Información Familiar</h3>
+          </div>
+          <div class="vp-mensaje-body">
+            <p>Su familiar se encuentra en recuperación. Por favor, permanezca en la sala de espera.</p>
+            <p><em>Your family member is in recovery. Please remain in the waiting room.</em></p>
+          </div>
+        </div>
+
+        <!-- Hora -->
+        <div class="vp-actualizacion">
+          Última actualización: <span id="horaActualizacion">--:--</span>
+        </div>
+
+      </div>
+    </div>
   </div>
 
-
-  <!-- Variables desde backend -->
+  <!-- Variables del Backend -->
   <script>
     const IDENTIFICACION = "{{ identificacion }}";
     const TOKEN = "{{ token if token else '' }}";
     const ACCESO_AUTOMATICO = {% if acceso_automatico %}true{% else %}false{% endif %};
   </script>
 
-
+  <!-- Scripts -->
+  <script src="{{ url_for('static', filename='tableros/js/config_tablero.js') }}"></script>
   <script src="{{ url_for('static', filename='tableros/js/vista_paciente.js') }}"></script>
 </body>
 </html>
