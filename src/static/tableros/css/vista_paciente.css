@@ -1,5 +1,4 @@
 /* ========== RESET Y BASE ========== */
-
 * {
   margin: 0;
   padding: 0;
@@ -19,15 +18,17 @@ body {
   transition: padding-top 0.3s ease;
 }
 
-/* === ALERTA SUPERIOR (VERDE CLÍNICO) === */
+/* === ALERTA SUPERIOR (LAVANDA / PÚRPURA TRANQUILO) === */
 .vp-alerta-top {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   background-color: #ffffff;
-  border-bottom: 4px solid #2E9B3E; /* Verde Recuperación */
-  box-shadow: 0 4px 20px rgba(46, 155, 62, 0.15);
+  /* CAMBIO: Color Lavanda para el borde inferior */
+  border-bottom: 4px solid #8E44AD; 
+  /* CAMBIO: Sombra púrpura suave */
+  box-shadow: 0 4px 20px rgba(142, 68, 173, 0.15);
   z-index: 9999;
   padding: 16px 20px;
   display: none; /* NACE OCULTA, se activa por JS */
@@ -45,7 +46,8 @@ body {
 .vp-alerta-icon-box {
   width: 40px;
   height: 40px;
-  background: #e8f5e9;
+  /* CAMBIO: Fondo lavanda muy suave */
+  background: #F4ECF7; 
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -54,7 +56,8 @@ body {
 }
 
 .vp-alerta-icon-box i {
-  color: #2E9B3E;
+  /* CAMBIO: Icono color lavanda fuerte */
+  color: #8E44AD; 
   font-size: 20px;
   animation: bounce-soft 1s infinite;
 }
@@ -66,7 +69,8 @@ body {
 
 .vp-alerta-mensaje h3 {
   font-size: 16px;
-  color: #1b5e20;
+  /* CAMBIO: Título color púrpura oscuro */
+  color: #6C3483; 
   font-weight: 800;
   margin-bottom: 2px;
 }
@@ -281,21 +285,23 @@ body.alerta-activa {
   font-weight: 400;
 }
 
-/* COLORES DE ESTADO */
+/* COLORES DE ESTADO NORMALES */
 .vp-estado-p { background-color: #00B4D8; color: white; }
 .vp-estado-q { background-color: #90A4AE; color: white; }
 .vp-estado-r { background-color: #2E9B3E; color: white; }
 
-/* LLAMADO: PARPADEO VERDE CÁLIDO */
+/* === LLAMADO: PARPADEO LAVANDA / PÚRPURA === */
 .vp-estado.llamando {
-  background-color: #2E9B3E !important; /* Verde Recuperación */
-  animation: pulse-green-border 1.5s infinite;
+  /* CAMBIO: Lavanda intenso */
+  background-color: #8E44AD !important; 
+  /* CAMBIO: Animación con sombra púrpura */
+  animation: pulse-purple-border 2s infinite; 
 }
 
-@keyframes pulse-green-border {
-  0%   { box-shadow: 0 0 0 0 rgba(46, 155, 62, 0.7); }
-  70%  { box-shadow: 0 0 0 15px rgba(46, 155, 62, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(46, 155, 62, 0); }
+@keyframes pulse-purple-border {
+  0%   { box-shadow: 0 0 0 0 rgba(142, 68, 173, 0.7); }
+  70%  { box-shadow: 0 0 0 15px rgba(142, 68, 173, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(142, 68, 173, 0); }
 }
 
 /* INFO & MENSAJES */

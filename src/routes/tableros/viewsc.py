@@ -438,85 +438,71 @@ def vista_paciente_personalizada(identificacion):
 
 @tableros_bp.route('/cirugia/paciente/validar', methods=['POST'])
 def validar_acceso_paciente():
-    """Valida acceso por clave O por token"""
+    """Valida acceso por clave O por token (Versión Corregida)"""
     try:
         data = request.get_json()
         identificacion = data.get("identificacion")
         clave = data.get("clave")
         token = data.get("token")
         
-        # Opción 1: Validar por token
+        # Función auxiliar para validar si es True en Informix
+        def es_verdadero(valor):
+            return valor in ('t', 'T', '1', 1, True)
+
+        # 1. Buscar paciente en BD (Lógica unificada para no repetir código)
+        paciente = None
+        with engine.begin() as conn:
+            # Traemos 'msm_llamado' explícitamente
+            result = conn.execute(text("""
+                SELECT ciride as id, cirnom as nombre, cirest as estado, llamado, msm_llamado
+                FROM PACMCIR1
+                WHERE ciride = :identificacion
+            """), {"identificacion": identificacion})
+            paciente = result.mappings().first()
+
+        if not paciente:
+            return jsonify({"success": False, "error": "Paciente no encontrado"}), 404
+
+        # 2. Construir respuesta exitosa
+        datos_respuesta = {
+            "success": True,
+            "paciente": {
+                "identificacion": paciente['id'],
+                "nombre": paciente['nombre'],
+                "estado": paciente['estado'],
+                # CORRECCIÓN CRÍTICA: Usar validación exacta de 't'/'f'
+                "llamado": es_verdadero(paciente['llamado']),
+                "mensaje": paciente['msm_llamado'] if paciente['msm_llamado'] else "Por favor acérquese a Cirugía"
+            }
+        }
+
+        # 3. Validar credenciales (Token o Clave)
+        acceso_valido = False
+        
+        # Validar Token
         if token and token in tokens_validos:
             datos_token = tokens_validos[token]
-            tiempo_transcurrido = time.time() - datos_token['timestamp']
-            
-            if tiempo_transcurrido < datos_token['expira_en']:
-                if datos_token['identificacion'] == identificacion:
-                    # Token válido, obtener datos
-                    with engine.begin() as conn:
-                        # [CORRECCIÓN] Agregamos 'llamado' a la consulta SQL
-                        result = conn.execute(text("""
-                            SELECT ciride as id, cirnom as nombre, cirest as estado, llamado
-                            FROM PACMCIR1
-                            WHERE ciride = :identificacion
-                        """), {"identificacion": identificacion})
-                        
-                        paciente = result.mappings().first()
-                        
-                        if not paciente:
-                            return jsonify({"success": False, "error": "Paciente no encontrado"}), 404
-                        
-                        return jsonify({
-                            "success": True,
-                            "paciente": {
-                                "identificacion": paciente['id'],
-                                "nombre": paciente['nombre'],
-                                "estado": paciente['estado'],
-                                # [CORRECCIÓN] Agregamos 'llamado' al JSON
-                                "llamado": bool(paciente['llamado']) if paciente['llamado'] else False
-                            }
-                        })
+            if (time.time() - datos_token['timestamp'] < datos_token['expira_en']) and \
+               (datos_token['identificacion'] == identificacion):
+                acceso_valido = True
             else:
-                # Token expirado
-                del tokens_validos[token]
-                return jsonify({"success": False, "error": "Token expirado"}), 401
-        
-        # Opción 2: Validar por clave
-        if clave:
-            if clave != identificacion[-4:]:
-                return jsonify({"success": False, "error": "Clave incorrecta"}), 401
-            
-            with engine.begin() as conn:
-                # [CORRECCIÓN] Agregamos 'llamado' a la consulta SQL
-                result = conn.execute(text("""
-                    SELECT ciride as id, cirnom as nombre, cirest as estado, llamado
-                    FROM PACMCIR1
-                    WHERE ciride = :identificacion
-                """), {"identificacion": identificacion})
-                
-                paciente = result.mappings().first()
-                
-                if not paciente:
-                    return jsonify({"success": False, "error": "Paciente no encontrado"}), 404
-                
-                return jsonify({
-                    "success": True,
-                    "paciente": {
-                        "identificacion": paciente['id'],
-                        "nombre": paciente['nombre'],
-                        "estado": paciente['estado'],
-                        # [CORRECCIÓN] Agregamos 'llamado' al JSON
-                        "llamado": bool(paciente['llamado']) if paciente['llamado'] else False
-                    }
-                })
-        
-        return jsonify({"success": False, "error": "Falta clave o token"}), 400
-    
+                if tiempo_transcurrido >= datos_token['expira_en']:
+                     del tokens_validos[token] # Limpiar expirado
+
+        # Validar Clave (si no entró por token)
+        if not acceso_valido and clave:
+            if clave == identificacion[-4:]:
+                acceso_valido = True
+
+        if acceso_valido:
+            return jsonify(datos_respuesta)
+        else:
+            return jsonify({"success": False, "error": "Credenciales inválidas o expiradas"}), 401
+
     except Exception as e:
         print(f"❌ Error al validar acceso: {e}")
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
-
 
 @tableros_bp.route('/cirugia/limpiar-tokens', methods=['POST'])
 def limpiar_tokens_expirados():

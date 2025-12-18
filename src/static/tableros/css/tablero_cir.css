@@ -955,3 +955,20 @@ body {
         font-size: 14px;
     }
 }
+
+/* Bloquear el scroll nativo al tocar una tarjeta para poder arrastrarla */
+/* ANTES: .paciente-card */
+.paciente-tarjeta {  /* AHORA: Coincide con tu JS */
+    touch-action: none; 
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: grab; /* Opcional: mejora visual */
+}
+
+/* Opcional: Aumentar un poco el tamaño para facilitar el toque */
+@media (max-width: 1024px) {
+    .paciente-tarjeta { /* También cambia este nombre */
+        padding: 20px;
+        margin-bottom: 15px;
+    }
+}

@@ -475,6 +475,7 @@ function renderizarPacientes() {
     renderColumna(recuperacion, porEstado.RECUPERACION);
 }
 
+// ========== RENDERIZAR COLUMNA (LIMPIO) ==========
 function renderColumna(contenedor, pacientes) {
     if (pacientes.length === 0) {
         contenedor.innerHTML = '<div class="sin-pacientes"><i class="fas fa-inbox"></i><p>No hay pacientes en esta área</p></div>';
@@ -487,7 +488,12 @@ function renderColumna(contenedor, pacientes) {
        
         const card = document.createElement("div");
         card.className = "paciente-card";
-        card.onclick = () => seleccionarPaciente(p);
+        
+        // Guardamos los datos REALES en el elemento HTML como atributos data-
+        // Esto evita cualquier problema con comillas o caracteres raros
+        card.dataset.id = p.identificacion;
+        card.dataset.nombre = p.nombre;
+        card.dataset.json = JSON.stringify(p); // Respaldo completo
         
         card.innerHTML = `
             <div class="paciente-info">
@@ -500,10 +506,11 @@ function renderColumna(contenedor, pacientes) {
                     <span>${nombreOculto}</span>
                 </div>
             </div>
-            <button class="btn-qr" onclick="event.stopPropagation(); seleccionarPaciente(${JSON.stringify(p).replace(/"/g, '&quot;')})">
+            <button class="btn-qr">
                 <i class="fas fa-qrcode"></i>
             </button>
         `;
+        
         contenedor.appendChild(card);
     });
 }
@@ -597,3 +604,25 @@ function actualizarHora() {
 
 // ========== INTERVALOS ==========
 setInterval(cargarPacientesPublico, CONFIG_TABLERO.INTERVALO_ACTUALIZACION);
+// ========== DELEGACIÓN DE EVENTOS (SOLUCIÓN FINAL) ==========
+document.addEventListener('click', function(e) {
+    // 1. Buscar si el clic fue dentro de una tarjeta de paciente
+    const tarjeta = e.target.closest('.paciente-card');
+    
+    if (tarjeta) {
+        // Recuperar los datos que guardamos en el dataset
+        const id = tarjeta.dataset.id;
+        const nombre = tarjeta.dataset.nombre;
+        
+        if (id && nombre) {
+            console.log("✅ Clic detectado en:", nombre);
+            
+            // Llamar a tu función original para seleccionar
+            // Reconstruimos el objeto paciente mínimo necesario
+            seleccionarPaciente({ 
+                identificacion: id, 
+                nombre: nombre 
+            });
+        }
+    }
+});

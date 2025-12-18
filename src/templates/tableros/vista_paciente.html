@@ -11,6 +11,7 @@
 </head>
 <body>
 
+
 <!-- CORREGIDO: ID 'zonaAlerta' y display: none explícito -->
 <div id="zonaAlerta" class="vp-alerta-top" style="display: none;">
     <div class="vp-alerta-icon-box">
@@ -23,46 +24,45 @@
     </div>
 </div>
 
+
   <div class="vp-container">
-    
+   
     <!-- HEADER -->
     <div class="vp-header">
-      <h1>Estado del Paciente</h1>
-      <p class="vp-header-sub">Seguimiento en tiempo real</p>
+      <h1>Ubicación del Paciente</h1>
+      <p class="vp-header-sub">Patient Location</p>
     </div>
+
 
     <!-- CARD PRINCIPAL -->
     <div class="vp-card">
 
+
       <!-- FORMULARIO DE ACCESO -->
       <div id="formulario-acceso" class="vp-formulario">
-        <h2>Ingrese la Clave de Acceso</h2>
-        <p>Utilice los 4 dígitos entregados en admisión</p>
-        
-        <input type="tel" 
-               id="clave" 
-               class="vp-input-clave" 
-               maxlength="4" 
-               placeholder="••••" 
+       
+        <input type="tel"
+               id="clave"
+               class="vp-input-clave"
+               maxlength="4"
+               placeholder="••••"
                autocomplete="off"
                inputmode="numeric">
-        
+       
         <button class="vp-btn" onclick="validarAcceso()">
-          CONSULTAR ESTADO
         </button>
-        
+       
         <div id="error-mensaje" class="vp-error"></div>
       </div>
 
+
       <!-- LOADER -->
-      <div id="loader" class="vp-loader" style="display: none;">
-        <div class="vp-spinner"></div>
-        <p class="vp-loader-text">Verificando información...</p>
-      </div>
+      <div id="loader" class="vp-loader" style="display: none;"></div>
+
 
       <!-- DATOS DEL PACIENTE -->
       <div id="datos-paciente" class="vp-datos" style="display: none;">
-        
+       
         <!-- Tarjeta de Estado -->
         <div id="estadoVisual" class="vp-estado">
           <div class="vp-estado-header">
@@ -70,50 +70,39 @@
               <i id="iconoEstado" class="fas fa-question-circle vp-icono-estado"></i>
             </div>
             <div class="vp-estado-textos">
-              <span id="nombreEstadoES" class="vp-estado-es">CARGANDO...</span>
-              <span id="nombreEstadoEN" class="vp-estado-en">Loading...</span>
+              <span id="nombreEstadoES" class="vp-estado-es"></span>
+              <span id="nombreEstadoEN" class="vp-estado-en"></span>
             </div>
           </div>
         </div>
+
 
         <!-- Info Paciente -->
         <div class="vp-info">
           <p class="vp-info-row">
             <span class="vp-info-label">
-              <i class="fas fa-user-circle vp-info-icon-fa"></i>
-              Paciente:
-            </span>
-            <span id="pacienteNombre">...</span>
-          </p>
-          <p class="vp-info-row">
-            <span class="vp-info-label">
               <i class="fas fa-id-card vp-info-icon-fa"></i>
-              ID:
+            <span id="pacienteID"></span>
+          </p>
+             <p class="vp-info-row">
+            <span class="vp-info-label">
+              <i class="fas fa-user-circle vp-info-icon-fa"></i>
             </span>
-            <span id="pacienteID">...</span>
+            <span id="pacienteNombre"></span>
           </p>
         </div>
 
-        <!-- Mensaje Recuperación -->
-        <div id="mensajeRecuperacion" class="vp-mensaje-recuperacion" style="display: none;">
-          <div class="vp-mensaje-header">
-            <i class="fas fa-info-circle"></i>
-            <h3>Información Familiar</h3>
-          </div>
-          <div class="vp-mensaje-body">
-            <p>Su familiar se encuentra en recuperación. Por favor, permanezca en la sala de espera.</p>
-            <p><em>Your family member is in recovery. Please remain in the waiting room.</em></p>
-          </div>
-        </div>
 
         <!-- Hora -->
         <div class="vp-actualizacion">
           Última actualización: <span id="horaActualizacion">--:--</span>
         </div>
 
+
       </div>
     </div>
   </div>
+
 
   <!-- Variables del Backend -->
   <script>
@@ -121,6 +110,7 @@
     const TOKEN = "{{ token if token else '' }}";
     const ACCESO_AUTOMATICO = {% if acceso_automatico %}true{% else %}false{% endif %};
   </script>
+
 
   <!-- Scripts -->
   <script src="{{ url_for('static', filename='tableros/js/config_tablero.js') }}"></script>

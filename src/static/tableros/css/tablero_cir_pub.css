@@ -20,6 +20,10 @@
     --shadow-sm: 0 2px 4px rgba(0,0,0,0.08);
     --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
     --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+    /* NUEVA VARIABLE PARA LLAMADO UNIFICADO */
+    --color-llamado: #8E44AD; /* Lavanda / Púrpura */
+    --color-llamado-suave: #F4ECF7;
+    --color-llamado-borde: #6C3483;
 }
 
 body {
@@ -32,7 +36,10 @@ body {
     flex-direction: column;
 }
 
-/* ===== HEADER PRINCIPAL ===== */
+/* ... (MANTENER TODO EL CSS DEL HEADER, GRID, COLUMNAS HASTA LLEGAR AL MODAL DE ALERTA) ... */
+/* ... (NO HE TOCADO NADA DE LA ESTRUCTURA DEL TABLERO, SOLO BAJA AL FINAL) ... */
+
+/* HEADER PRINCIPAL */
 .header-principal {
     background: var(--bg-white);
     box-shadow: var(--shadow-md);
@@ -40,7 +47,6 @@ body {
     top: 0;
     z-index: 100;
 }
-
 .header-content {
     display: flex;
     justify-content: space-between;
@@ -48,29 +54,24 @@ body {
     padding: 20px 30px;
     border-bottom: 1px solid var(--border-color);
 }
-
 .logo-section {
     display: flex;
     align-items: center;
     gap: 15px;
 }
-
 .logo-section i {
     font-size: 40px;
     color: var(--color-primary);
 }
-
 .header-text h1 {
     font-size: 24px;
     color: var(--text-dark);
     margin-bottom: 2px;
 }
-
 .header-text p {
     font-size: 13px;
     color: var(--text-light);
 }
-
 .update-info {
     display: flex;
     align-items: center;
@@ -78,28 +79,24 @@ body {
     color: var(--text-light);
     font-size: 13px;
 }
-
 .update-info i {
     animation: rotate 2s linear infinite;
 }
-
 @keyframes rotate {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
 }
 
-/* ===== CONTENIDO PRINCIPAL ===== */
+/* CONTENIDO PRINCIPAL */
 .main-content {
     padding: 30px;
     flex: 1;
 }
-
 .tablero-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 25px;
 }
-
 .columna-estado {
     background: var(--bg-white);
     border-radius: 15px;
@@ -110,7 +107,7 @@ body {
     min-height: 600px;
 }
 
-/* ===== HEADERS DE COLUMNAS ===== */
+/* HEADERS DE COLUMNAS */
 .columna-header {
     padding: 15px 20px;
     color: white;
@@ -118,136 +115,112 @@ body {
     align-items: center;
     gap: 12px;
 }
-
 .columna-header.preparacion {
     background: linear-gradient(135deg, var(--color-preparacion), #0096C7);
 }
-
 .columna-header.quirofano {
     background: linear-gradient(135deg, var(--color-quirofano), #78909C);
 }
-
 .columna-header.recuperacion {
     background: linear-gradient(135deg, var(--color-recuperacion), #388E3C);
 }
-
 .header-icon {
     font-size: 24px;
     opacity: 0.9;
 }
-
 .columna-header h2 {
     font-size: 18px;
     font-weight: 600;
     margin: 0;
 }
 
-/* ===== LISTA DE PACIENTES ===== */
+/* LISTA DE PACIENTES */
 .lista-pacientes {
     padding: 15px;
     flex: 1;
     overflow-y: auto;
 }
-
-/* Tarjeta estilo panel moderno */
 .paciente-card {
-  background: #ffffff;                     /* antes var(--bg-light) */
-  border-radius: 12px;
-  padding: 14px 16px;
-  margin-bottom: 12px;
-  display: flex;
-  align-items: center;                     /* centrado vertical */
-  justify-content: space-between;
-  gap: 12px;
-  border: 1px solid #d4e4f4;               /* borde suave como panel */
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border: 1px solid #d4e4f4;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
 }
-
 .paciente-card:hover {
-  transform: translateY(-1px);
-  border-color: var(--color-primary);
-  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.12);
-  background: #f9fcff;
+    transform: translateY(-1px);
+    border-color: var(--color-primary);
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.12);
+    background: #f9fcff;
 }
-
-/* Icono a la izquierda (estilo panel) */
 .paciente-icon {
-  font-size: 24px;
-  color: var(--color-primary);
-  min-width: 24px;
+    font-size: 24px;
+    color: var(--color-primary);
+    min-width: 24px;
 }
-
-/* Contenedor de textos */
 .paciente-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
 }
-/* Línea ID similar al panel */
 .paciente-id {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--text-light);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text-light);
 }
-
 .paciente-id i {
-  color: var(--color-primary);
-  font-size: 14px;
+    color: var(--color-primary);
+    font-size: 14px;
 }
-
-/* Nombre del paciente como en el panel */
 .paciente-nombre {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-dark);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-dark);
 }
-
 .paciente-nombre i {
-  color: var(--color-primary);
-  font-size: 16px;
+    color: var(--color-primary);
+    font-size: 16px;
 }
-
 .sin-pacientes {
     text-align: center;
     color: var(--text-light);
     padding: 60px 20px;
     opacity: 0.5;
 }
-
 .sin-pacientes i {
     font-size: 48px;
     margin-bottom: 15px;
     display: block;
 }
-
-/* ===== SCROLLBAR ===== */
 .lista-pacientes::-webkit-scrollbar {
     width: 8px;
 }
-
 .lista-pacientes::-webkit-scrollbar-track {
     background: #f1f1f1;
     border-radius: 10px;
 }
-
 .lista-pacientes::-webkit-scrollbar-thumb {
     background: var(--color-primary);
     border-radius: 10px;
 }
-
 .lista-pacientes::-webkit-scrollbar-thumb:hover {
     background: #0277BD;
 }
 
-/* ===== FOOTER ===== */
+/* FOOTER */
 .footer-info {
     background: var(--bg-white);
     padding: 15px 30px;
@@ -255,13 +228,11 @@ body {
     position: sticky;
     bottom: 0;
 }
-
 .footer-content {
     display: flex;
     justify-content: center;
     align-items: center;
 }
-
 .connection-status {
     display: flex;
     align-items: center;
@@ -269,19 +240,17 @@ body {
     font-size: 13px;
     color: var(--text-light);
 }
-
 .status-dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
 }
-
 .status-dot.online {
     background: var(--color-success);
     box-shadow: 0 0 8px var(--color-success);
 }
 
-/* ===== MODAL OVERLAY ===== */
+/* MODALES BASE */
 .modal-overlay {
     position: fixed;
     top: 0;
@@ -295,34 +264,31 @@ body {
     z-index: 10000;
     animation: fadeIn 0.3s;
 }
-
 @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
 }
 
-/* ===== MODAL CLAVE ===== */
+/* ========================================= */
+/* BLOQUE RECUPERADO: MODAL CLAVE Y QR       */
+/* ========================================= */
+
+/* ===== MODAL CLAVE (Estilo Tarjeta Blanca) ===== */
 .modal-clave {
-    background: var(--bg-white);
+    background: #ffffff;
     padding: 40px;
     border-radius: 15px;
     max-width: 450px;
     width: 90%;
     text-align: center;
     position: relative;
-    animation: slideUp 0.4s;
-    box-shadow: var(--shadow-lg);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    animation: slideUp 0.3s;
 }
 
 @keyframes slideUp {
-    from {
-        transform: translateY(50px);
-        opacity: 0;
-    }
-    to {
-        transform: translateY(0);
-        opacity: 1;
-    }
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
 }
 
 .modal-icon-lock {
@@ -337,210 +303,123 @@ body {
     right: 20px;
     background: none;
     border: none;
-    font-size: 28px;
+    font-size: 24px;
     cursor: pointer;
     color: var(--text-light);
-    transition: all 0.3s;
-    width: 35px;
-    height: 35px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    transition: color 0.2s;
 }
-
-.cerrar-modal:hover {
-    color: var(--color-danger);
-    transform: rotate(90deg);
-}
+.cerrar-modal:hover { color: var(--color-danger); }
 
 .modal-clave h2 {
     color: var(--text-dark);
     margin-bottom: 10px;
-    font-size: 28px;
+    font-size: 24px;
 }
 
 .info-modal {
     color: var(--text-light);
-    margin-bottom: 30px;
+    margin-bottom: 25px;
     font-size: 15px;
 }
 
 .input-clave {
     width: 100%;
-    padding: 20px;
-    font-size: 32px;
+    padding: 15px;
+    font-size: 28px;
     text-align: center;
-    letter-spacing: 20px;
-    border: 3px solid var(--border-color);
-    border-radius: 12px;
+    letter-spacing: 12px;
+    border: 2px solid var(--border-color);
+    border-radius: 10px;
     margin-bottom: 20px;
-    transition: all 0.3s;
-    font-weight: bold;
+    transition: border-color 0.3s;
+    background: #fff; /* Fondo blanco explícito */
 }
 
 .input-clave:focus {
     outline: none;
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 5px rgba(2, 136, 209, 0.1);
 }
 
 .btn-validar {
     width: 100%;
-    padding: 18px;
+    padding: 15px;
     background: linear-gradient(135deg, var(--color-primary), #0277BD);
     color: white;
     border: none;
-    border-radius: 12px;
+    border-radius: 10px;
     font-size: 16px;
     font-weight: bold;
     cursor: pointer;
-    transition: all 0.3s;
-    box-shadow: 0 4px 15px rgba(2, 136, 209, 0.3);
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 10px;
+    transition: transform 0.2s;
 }
-
-.btn-validar:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 20px rgba(2, 136, 209, 0.4);
-}
-
-.btn-validar:active {
-    transform: translateY(0);
-}
+.btn-validar:hover { transform: translateY(-2px); }
 
 .error-mensaje {
     color: var(--color-danger);
     margin-top: 15px;
+    min-height: 20px;
     font-size: 14px;
     font-weight: 600;
-    min-height: 20px;
 }
 
-@keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-10px); }
-    75% { transform: translateX(10px); }
-}
-
-/* ===== MODAL QR ===== */
+/* ===== MODAL QR (Estilo Exito) ===== */
 .modal-qr {
-    background: var(--bg-white);
+    background: #ffffff;
     padding: 40px;
     border-radius: 15px;
     max-width: 500px;
     width: 90%;
     text-align: center;
     position: relative;
-    animation: slideUp 0.4s;
-    box-shadow: var(--shadow-lg);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    animation: slideUp 0.3s;
 }
 
 .success-icon {
-    font-size: 64px;
+    font-size: 60px;
     color: var(--color-success);
     margin-bottom: 15px;
-    animation: scaleIn 0.5s;
-}
-
-@keyframes scaleIn {
-    from {
-        transform: scale(0);
-        opacity: 0;
-    }
-    to {
-        transform: scale(1);
-        opacity: 1;
-    }
-}
-
-.modal-qr h2 {
-    color: var(--color-success);
-    margin-bottom: 10px;
-    font-size: 32px;
-}
-
-.info-exito {
-    color: var(--text-light);
-    margin-bottom: 30px;
-    font-size: 16px;
 }
 
 .qr-container {
-    background: linear-gradient(135deg, #E3F2FD, #BBDEFB);
-    padding: 30px;
-    border-radius: 15px;
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 10px;
     margin: 20px 0;
+    display: inline-block;
+    border: 1px solid #eee;
 }
 
 .qr-image {
-    width: 280px;
-    height: 280px;
-    border: 5px solid white;
-    border-radius: 12px;
-    background: white;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    margin: 0 auto;
+    width: 250px;
+    height: 250px;
+    display: block;
 }
 
 .info-paciente-qr {
     font-size: 18px;
     font-weight: bold;
-    color: var(--color-primary);
-    margin: 20px 0;
-    padding: 15px;
-    background: #E3F2FD;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-}
-
-.instrucciones-qr {
-    color: var(--text-light);
-    font-size: 14px;
-    margin-bottom: 25px;
+    color: var(--text-dark);
+    margin: 15px 0;
 }
 
 .btn-cerrar-qr {
-    width: 100%;
-    padding: 15px;
-    background: var(--bg-light);
-    color: var(--text-dark);
-    border: 2px solid var(--border-color);
-    border-radius: 10px;
-    font-size: 16px;
-    font-weight: 600;
+    padding: 10px 20px;
+    border: 1px solid var(--border-color);
+    background: white;
+    border-radius: 8px;
     cursor: pointer;
-    transition: all 0.3s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
+    font-weight: 600;
+    color: var(--text-dark);
+    transition: background 0.2s;
 }
+.btn-cerrar-qr:hover { background: #f1f1f1; }
 
-.btn-cerrar-qr:hover {
-    background: var(--border-color);
-    border-color: var(--text-light);
-}
-
-/* ===== RESPONSIVE ===== */
-@media (max-width: 1200px) {
-    .tablero-grid {
-        grid-template-columns: 1fr;
-    }
-}
-
-@media (max-width: 768px) {
-    .header-content {
-        flex-direction :column;
-    }
-}
-
-/* ========== MODAL DE ALERTA DE LLAMADO ========== */
+/* ========== MODAL DE ALERTA DE LLAMADO (MODIFICADO A LAVANDA) ========== */
 
 /* Modal overlay */
 .modal-llamado-overlay {
@@ -557,11 +436,6 @@ body {
   animation: fadeIn 0.3s ease;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
 /* Contenido del modal */
 .modal-llamado-content {
   background: white;
@@ -571,17 +445,18 @@ body {
   width: 90%;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   animation: pulsar-modal 2s ease-in-out infinite;
-  border: 5px solid #28a745;
+  /* CAMBIO: Color Lavanda Borde */
+  border: 5px solid var(--color-llamado);
 }
 
 @keyframes pulsar-modal {
   0%, 100% {
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 0 0 0 0 rgba(40, 167, 69, 0.7);
-    border-color: #28a745;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 0 0 0 0 rgba(142, 68, 173, 0.7);
+    border-color: #8E44AD;
   }
   50% {
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 0 0 40px 10px rgba(40, 167, 69, 0);
-    border-color: #20c997;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 0 0 40px 10px rgba(142, 68, 173, 0);
+    border-color: #A569BD;
   }
 }
 
@@ -593,7 +468,8 @@ body {
 
 .alerta-icono {
   font-size: 4rem;
-  color: #28a745;
+  /* CAMBIO: Icono Lavanda */
+  color: var(--color-llamado);
   animation: sacudir-campana 0.5s ease-in-out infinite;
   margin-bottom: 1rem;
   display: block;
@@ -608,14 +484,16 @@ body {
 
 .alerta-header h2 {
   font-size: 2.5rem;
-  color: #28a745;
+  /* CAMBIO: Título Lavanda */
+  color: var(--color-llamado);
   margin: 0;
   font-weight: 700;
 }
 
 /* Tarjeta del paciente ampliada */
 .paciente-llamado-card {
-  background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+  /* CAMBIO: Gradiente Lavanda Suave */
+  background: linear-gradient(135deg, #F4ECF7 0%, #E8DAEF 100%);
   border-radius: 16px;
   padding: 2.5rem;
   margin: 2rem 0;
@@ -625,10 +503,10 @@ body {
 
 @keyframes pulsar-card {
   0%, 100% {
-    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    background: linear-gradient(135deg, #F4ECF7 0%, #E8DAEF 100%);
   }
   50% {
-    background: linear-gradient(135deg, #c3e6cb 0%, #a8d5ba 100%);
+    background: linear-gradient(135deg, #E8DAEF 0%, #D2B4DE 100%);
   }
 }
 
@@ -644,28 +522,32 @@ body {
 .paciente-id-grande i,
 .paciente-nombre-grande i {
   font-size: 2rem;
-  color: #155724;
+  /* CAMBIO: Iconos oscuros */
+  color: var(--color-llamado-borde);
 }
 
 .paciente-id-grande span {
   font-size: 2.5rem;
   font-weight: 700;
-  color: #155724;
+  /* CAMBIO: Texto oscuro */
+  color: var(--color-llamado-borde);
   font-family: 'Courier New', monospace;
 }
 
 .paciente-nombre-grande span {
   font-size: 2rem;
   font-weight: 600;
-  color: #155724;
+  /* CAMBIO: Texto oscuro */
+  color: var(--color-llamado-borde);
   text-transform: uppercase;
 }
 
 /* Mensaje de llamado */
 .mensaje-llamado {
   text-align: center;
-  background: #fff3cd;
-  border: 3px solid #ffc107;
+  background: #fff;
+  /* CAMBIO: Borde Púrpura */
+  border: 3px solid var(--color-llamado-borde);
   border-radius: 12px;
   padding: 1.5rem;
   margin: 2rem 0;
@@ -673,13 +555,16 @@ body {
 
 .mensaje-llamado p {
   font-size: 1.8rem;
-  color: #856404;
+  /* CAMBIO: Texto oscuro */
+  color: var(--color-llamado-borde);
   margin: 0;
   font-weight: 600;
 }
 
 .mensaje-llamado strong {
-  color: #d63384;
+  /* CAMBIO: Resaltado fucsia o lavanda fuerte */
+  color: #D35400; /* Un naranja oscuro para contraste o mantener lavanda */
+  /* O puedes usar: color: var(--color-llamado); */
   font-size: 2rem;
 }
 
@@ -700,7 +585,8 @@ body {
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
+  /* CAMBIO: Barra de progreso Lavanda */
+  background: linear-gradient(90deg, var(--color-llamado) 0%, #9B59B6 100%);
   width: 100%;
   transition: width 0.1s linear;
 }
@@ -713,38 +599,38 @@ body {
 
 #segundos-restantes {
   font-weight: 700;
-  color: #28a745;
+  /* CAMBIO: Texto tiempo */
+  color: var(--color-llamado);
   font-size: 1.4rem;
 }
 
-/* Responsive */
+/* RESPONSIVE */
+@media (max-width: 1200px) {
+    .tablero-grid {
+        grid-template-columns: 1fr;
+    }
+}
 @media (max-width: 768px) {
-  .modal-llamado-content {
-    padding: 2rem;
-    width: 95%;
-  }
-  
-  .alerta-icono {
-    font-size: 3rem;
-  }
-  
-  .alerta-header h2 {
-    font-size: 2rem;
-  }
-  
-  .paciente-id-grande span {
-    font-size: 2rem;
-  }
-  
-  .paciente-nombre-grande span {
-    font-size: 1.5rem;
-  }
-  
-  .mensaje-llamado p {
-    font-size: 1.4rem;
-  }
-  
-  .mensaje-llamado strong {
-    font-size: 1.6rem;
-  }
+    .header-content {
+        flex-direction :column;
+    }
+    .modal-llamado-content {
+        padding: 2rem;
+        width: 95%;
+    }
+    .alerta-icono {
+        font-size: 3rem;
+    }
+    .alerta-header h2 {
+        font-size: 2rem;
+    }
+    .paciente-id-grande span {
+        font-size: 2rem;
+    }
+    .paciente-nombre-grande span {
+        font-size: 1.5rem;
+    }
+    .mensaje-llamado p {
+        font-size: 1.4rem;
+    }
 }
