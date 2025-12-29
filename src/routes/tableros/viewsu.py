@@ -2,104 +2,145 @@ from flask import render_template, request, jsonify
 from src import engine
 from sqlalchemy import text
 from datetime import datetime
-import pandas as pd
-import io
-from dotenv import load_dotenv
-import google.generativeai as genai
 import os
 import traceback
-import unicodedata
-import re
+from dotenv import load_dotenv
+import google.generativeai as genai
 from . import tableros_bp
 
-
-# --------------------------------------------
-# 🔹 Cargar variables de entorno
+# Cargar variables
 load_dotenv()
-
 api_key = os.getenv("GOOGLE_API_KEY")
-if not api_key:
-    raise ValueError("⚠️ No se encontró GOOGLE_API_KEY en .env")
 
-# 🔹 Configura el modelo Gemini
-genai.configure(api_key=api_key)
-model = genai.GenerativeModel("gemini-2.5-flash")
+if api_key:
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel("gemini-2.5-flash")
+else:
+    model = None
 
-# --------------------------------------------
-fecha_actual = datetime.now().strftime('%Y-%m-%d')
-
-
-# --------------------------------------------
-# 🔹 Vista principal del tablero de URGENCIAS
 @tableros_bp.route('/urgencias', methods=['GET'])
 def tablero_urg():
-    """Renderiza el tablero de Urgencias"""
     try:
-        with engine.connect() as conn:
-            # Ajusta según los códigos de ubicación de urgencias en tu BD
+        with engine.begin() as conn:
+            # Consultar directamente con CASE statement
             result = conn.execute(text("""
-                SELECT ubicod, ubinom 
-                FROM INUBI 
-                WHERE UBICOD IN ('U1', 'U2', 'U3', 'UR')
-                ORDER BY 1
+                SELECT DISTINCT 
+                    CASE WHEN HABCOD IN ('CON1','CON2','CON3','CECO') THEN 'CONSULTORIOS' 
+                         WHEN HABCOD IN ('C1O1','C2O1','C301','C4O1','C5O1','C6O1') THEN 'OBSERVACION 1' 
+                         WHEN HABCOD IN ('C1O2','C2O2','C302','C4O2','C5O2','C6O2') THEN 'OBSERVACION 2'
+                         WHEN HABCOD IN ('REAN','PEQC','REA1','SER1','SER2') THEN 'SALAS' END AS UBICA,
+                    CASE WHEN HABCOD IN ('CON1','CON2','CON3','CECO') THEN 1
+                         WHEN HABCOD IN ('C1O1','C2O1','C301','C4O1','C5O1','C6O1') THEN 2
+                         WHEN HABCOD IN ('C1O2','C2O2','C302','C4O2','C5O2','C6O2') THEN 3
+                         WHEN HABCOD IN ('REAN','PEQC','REA1','SER1','SER2') THEN 4 END AS TIPO
+                FROM INHAB 
+                WHERE HABACT = 'S' AND HABUBI = 'UR'
+                ORDER BY TIPO
             """))
-            servicios = result.fetchall()
+            servicios = [{'ubicod': row[1], 'ubinom': row[0]} for row in result]
         return render_template('tableros/tablero_urg.html', servicios=servicios)
     except Exception as e:
-        return f"Error cargando los servicios: {str(e)}", 500
+        print(f"Error carga servicios: {e}")
+        traceback.print_exc()
+        return render_template('tableros/tablero_urg.html', servicios=[])
 
-
-# --------------------------------------------
-# 🔹 Endpoint: datos del tablero de URGENCIAS
 @tableros_bp.route('/urgencias/datos', methods=['POST'])
 def obtener_datos_urg():
-    """Obtiene datos de pacientes e indicadores de urgencias"""
     try:
         data = request.json
-        ubicod = data.get('ubicod')
-
+        ubicod = data.get('ubicod')  # Puede ser INT o lista [1,2,4]
         if not ubicod:
             return jsonify({"error": "Falta parámetro ubicod"}), 400
 
-        with engine.begin() as conn:
-            # ⚙️ Ejecuta el SP con el parámetro correcto
-            # Ajusta el nombre del SP según tu base de datos
-            conn.execute(text("EXECUTE PROCEDURE SP_Escalas_urgd(:ubicod)"), {"ubicod": ubicod})
+        # Convertir a cadena delimitada por comas
+        if isinstance(ubicod, list):
+            tipos_str = ','.join(str(u) for u in ubicod if u)
+        else:
+            tipos_str = str(ubicod)
+        
+        if not tipos_str:
+            return jsonify({"error": "Sin ubicaciones seleccionadas"}), 400
 
-            # 🔹 Datos de pacientes
-            result_pacientes = conn.execute(text("""
-                SELECT ESCHIS, ESCNUM, ESCIDE, ESCEDA, ESCPAC, ESCHAB, ESCDIA, ESCEPI, ESCGOL,
-                       ESGRGB, ESCBRA, ESBINT, ESBRGB, ESCRIE, ESRINT, ESRRGB, DIAEST, DIAESG, ORDAIS
+        with engine.begin() as conn:
+            # 1. Ejecutar SP con cadena delimitada - Usar f-string para Informix
+            sql_sp = f"EXECUTE PROCEDURE SP_Escalas_urgd('{tipos_str}')"
+            conn.execute(text(sql_sp))
+
+            # 2. Consultar Pacientes
+            # Usamos mappings() para asegurar diccionarios, no tuplas
+            q_pacientes = text("""
+                SELECT ESCHIS,ESCNUM,ESCIDE,ESCEDA,ESCPAC,ESCHAB,ESCDIA,ESCEPI,
+                       ESCGRA,ESGINT,ESGRGB,
+                       ESCCUR,ESCINT,ESCRGB,
+                       ESCRIE,ESRINT,ESRRGB,
+                       ESCNIH,ESNINT,ESNRGB,
+                       DIAEST,DIAESG,ORDAIS
                 FROM ESCALAS1
                 ORDER BY ESCHAB
-            """))
-            pacientes = result_pacientes.mappings().all()
+            """)
+            pacientes = [dict(row) for row in conn.execute(q_pacientes).mappings()]
 
-            # 🔹 Indicadores
-            total_pacientes = conn.execute(text("SELECT TOTAL_PACIENTES FROM TOTPACURG1")).scalar()
-            escala_goldberg = conn.execute(text("SELECT CATEGORIA, TOTAL FROM GOLDURG1")).mappings().all()
-            riesgo_lpp = conn.execute(text("SELECT NO_PACI, TRIM(ESCALAPOR) ESCALAPOR FROM ESCUPPURG1")).mappings().all()
-            riesgo_caida = conn.execute(text("SELECT NO_PACI, TRIM(ESCALAPOR) ESCALAPOR FROM RIECAURG1")).mappings().all()
-            promedio_estancia = conn.execute(text("SELECT PROM FROM PROMESURG1")).scalar()
+                        # 3. Consultar Indicadores (Bloque Robustecido)
+            # Inicializamos variables por defecto
+            total_pacientes = 0
+            promedio_estancia = "0"
+            escala_grace = []
+            riesgo_curb65 = []
+            riesgo_caida = []
+            riesgo_nihss = []
 
-            # 🔹 Armar respuesta JSON
-            response_data = {
-                "pacientes_en_cama": [dict(row) for row in pacientes],
+            # A. Total Pacientes
+            try:
+                total_pacientes = conn.execute(text("SELECT TOTAL_PACIENTES FROM TOTPAC1")).scalar() or 0
+            except Exception as e:
+                print(f"⚠️ Error Totales: {e}")
+
+            # B. Promedio Estancia
+            try:
+                promedio_estancia = conn.execute(text("SELECT PROM FROM PROMES1")).scalar() or "0"
+            except Exception as e:
+                print(f"⚠️ Error Promedio: {e}")
+
+            # C. Escala GRACE
+            try:
+                escala_grace = [dict(row) for row in conn.execute(text("SELECT TRIM(ESCALAPOR) ESCALAPOR, NO_PACI FROM GRACE1")).mappings()]
+            except Exception as e:
+                print(f"⚠️ Error GRACE1: {e}")
+
+            # D. Riesgo CURB-65
+            try:
+                riesgo_curb65 = [dict(row) for row in conn.execute(text("SELECT TRIM(ESCALAPOR) ESCALAPOR, NO_PACI FROM CURB1")).mappings()]
+            except Exception as e:
+                print(f"⚠️ Error CURB1: {e}")
+
+            # E. Riesgo CAÍDA
+            try:
+                riesgo_caida = [dict(row) for row in conn.execute(text("SELECT TRIM(ESCALAPOR) ESCALAPOR, NO_PACI FROM RIECA1")).mappings()]
+            except Exception as e:
+                print(f"⚠️ Error RIECA1: {e}")
+
+            # F. Riesgo NIHSS
+            try:
+                riesgo_nihss = [dict(row) for row in conn.execute(text("SELECT TRIM(ESCALAPOR) ESCALAPOR, NO_PACI FROM NIHSS1")).mappings()]
+            except Exception as e:
+                print(f"⚠️ Error NIHSS1: {e}")
+
+            # Retorno JSON
+            return jsonify({
+                "pacientes_en_cama": pacientes,
                 "indicadores": {
                     "total_pacientes": total_pacientes,
-                    "escala_goldberg": [dict(row) for row in escala_goldberg],
-                    "riesgo_lpp": [dict(row) for row in riesgo_lpp],
-                    "riesgo_caida": [dict(row) for row in riesgo_caida],
-                    "promedio_estancia": str(promedio_estancia) if promedio_estancia else "0",
+                    "escala_grace": escala_grace,
+                    "riesgo_curb65": riesgo_curb65,
+                    "riesgo_caida": riesgo_caida,
+                    "riesgo_nihss": riesgo_nihss,
+                    "promedio_estancia": str(promedio_estancia)
                 }
-            }
-        return jsonify(response_data)
+            })
 
     except Exception as e:
-        print("❌ Error en obtener_datos_urg:")
-        traceback.print_exc()
-        return jsonify({"error": f"Error al ejecutar SP_Escalas_urgd: {str(e)}"}), 500
-
+        traceback.print_exc() # Esto imprimirá el error real en la consola de Docker
+        return jsonify({"error": f"Error servidor: {str(e)}"}), 500
 
 # --------------------------------------------
 # 🔹 Conversión a lenguaje natural (IA)
@@ -158,7 +199,7 @@ def obtener_riesgos_necesidades_urg():
             paciente = conn.execute(
                 text("""
                     SELECT ESCIDE, ESCPAC, ESCHAB, ESCDIA, ESCEPI
-                    FROM ESCALASURG1 
+                    FROM ESCALAS1 
                     WHERE ESCIDE = :escide
                 """),
                 {"escide": escide}

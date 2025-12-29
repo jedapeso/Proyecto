@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tablero Urgencias</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- CSS específico del tablero de Urgencias -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='tableros/css/tablero_urg.css') }}">
+</head>
+<body class="h-screen">
+    <div class="container">
+        <header class="header mb-6 flex justify-between items-center">
+            <h1>Monitorización de riesgos en tiempo real - Urgencias</h1>
+            <div class="flex gap-2">
+                {% for u in servicios %}
+                <button class="ubicacion-btn px-4 py-2 rounded-lg font-semibold text-sm transition-all border-2" 
+                        data-tipo="{{ u.ubicod }}"
+                        style="background: white; border-color: #d1d5db; color: #6b7280;">
+                    {{ u.ubinom }}
+                </button>
+                {% endfor %}
+            </div>
+        </header>
+
+        <section class="flex flex-col md:flex-row items-stretch justify-center gap-6 mb-6">
+            <div class="bg-white shadow rounded-lg p-3 text-center md:w-1/6 flex flex-col justify-center">
+                <h3 class="text-base font-medium text-gray-600 mb-2">
+                    Total Pacientes
+                </h3>
+                <p id="total-pacientes" class="text-5xl font-bold text-gray-700">0</p>
+            </div>
+
+            <div class="bg-white shadow rounded-lg p-2 overflow-x-auto md:w-4/6 flex flex-col justify-center">
+                <table class="w-full text-xs text-center border-collapse">
+                    <thead class="bg-gray-100 text-gray-700 uppercase">
+                    <tr>
+                        <th colspan="2" class="px-2 py-1 border">Escala GRACE</th>
+                        <th colspan="2" class="px-2 py-1 border">Riesgo CURB-65</th>
+                        <th colspan="2" class="px-2 py-1 border">Riesgo de Caída</th>
+                        <th colspan="2" class="px-2 py-1 border">Escala NIHSS</th>
+                    </tr>
+                    <tr>
+                        <th class="px-2 py-1 border">#Pacientes</th>
+                        <th class="px-2 py-1 border">Clasificación</th>
+                        <th class="px-2 py-1 border">#Pacientes</th>
+                        <th class="px-2 py-1 border">Nivel</th>
+                        <th class="px-2 py-1 border">#Pacientes</th>
+                        <th class="px-2 py-1 border">Riesgo</th>
+                        <th class="px-2 py-1 border">#Pacientes</th>
+                        <th class="px-2 py-1 border">Severidad</th>
+                    </tr>
+                    </thead>
+                    <tbody id="tabla-indicadores"></tbody>
+                </table>
+            </div>
+
+            <div class="bg-white shadow rounded-lg p-3 text-center md:w-1/6 flex flex-col justify-center">
+                <h3 class="text-base font-medium text-gray-600 mb-2">Promedio Estancia</h3>
+                <p id="promedio-estancia" class="text-3xl font-bold text-gray-700">0</p>
+            </div>
+        </section>
+
+        <section class="pager-wrapper flex items-center justify-between mb-4">
+            <button id="prevPage" class="page-btn" aria-label="Página anterior" title="Anterior">&#10094;</button>
+            <div id="contenedor-tarjetas" class="cards-container grid-2x4 flex-1 mx-4"></div>
+            <button id="nextPage" class="page-btn" aria-label="Página siguiente" title="Siguiente">&#10095;</button>
+        </section>
+
+        <div class="page-info text-center mb-6">
+            <span id="pageIndicator">Página 0 de 0</span>
+        </div>
+    </div>
+
+    <!-- Modal resumen paciente -->
+    <div id="resumenModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl w-3/4 max-w-2xl max-h-[80vh] p-6 relative animate-fadeIn overflow-y-auto">
+            <button id="cerrarModal" class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-xl">&times;</button>
+            <h2 class="text-xl font-bold mb-4">Datos del Paciente</h2>
+            <div id="contenidoResumen" class="text-gray-700 whitespace-pre-line text-justify"></div>
+            <div id="modal-loading" class="absolute inset-0 bg-white bg-opacity-80 flex flex-col items-center justify-center text-lg font-semibold hidden">
+                <svg aria-hidden="true" class="w-8 h-8 text-gray-200 animate-spin fill-blue-600 mb-3" viewBox="0 0 100 101" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908Z" fill="currentColor"/>
+                    <path d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124Z" fill="currentFill"/>
+                </svg>
+                <span>Generando Datos Con IA...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts específicos del tablero Urgencias -->
+    <script type="module" src="{{ url_for('static', filename='tableros/js/indicadores_urg.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='tableros/js/tablero_urg.js') }}"></script>
+
+    <div id="ultima-actualizacion"
+        class="fixed bottom-2 left-2 text-xs text-gray-600 bg-white bg-opacity-70 px-2 py-1 rounded shadow">
+        Última actualización: --
+    </div>
+</body>
+</html>

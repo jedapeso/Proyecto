@@ -4,17 +4,6 @@ app_flask
 ├─ .env
 ├─ config
 │  ├─ iconos
-│  │  ├─ Aislamiento.png
-│  │  ├─ Aislamiento2.png
-│  │  ├─ F-GTH-03 FORMATO SOLICITUD DE VACACIONES.doc
-│  │  ├─ Gemini_Generated_Image_37un3i37un3i37un.png
-│  │  ├─ Gemini_Generated_Image_5p6xet5p6xet5p6x.png
-│  │  ├─ Gemini_Generated_Image_89a3yy89a3yy89a3.png
-│  │  ├─ Gemini_Generated_Image_p8yz3ip8yz3ip8yz.png
-│  │  ├─ Gemini_Generated_Image_z62ql1z62ql1z62q.png
-│  │  ├─ GOLDB_ESPSICO1.xlsx
-│  │  ├─ GOLDB_INTERCOL1.xlsx
-│  │  └─ PixVerse_Image_Effect_prompt_necesito rediseña.jpg
 │  ├─ mails
 │  │  └─ destinatarios.txt
 │  └─ prompts
@@ -54,10 +43,13 @@ app_flask
 │  │  │  ├─ views.py
 │  │  │  ├─ viewsc.py
 │  │  │  ├─ viewsh.py
+│  │  │  ├─ viewsu.py
 │  │  │  ├─ __init__.py
 │  │  │  └─ __pycache__
 │  │  │     ├─ views.cpython-311.pyc
+│  │  │     ├─ viewsc.cpython-311.pyc
 │  │  │     ├─ viewsh.cpython-311.pyc
+│  │  │     ├─ viewsu.cpython-311.pyc
 │  │  │     └─ __init__.cpython-311.pyc
 │  │  ├─ urgencias
 │  │  │  ├─ views.py
@@ -94,13 +86,24 @@ app_flask
 │  │  ├─ tableros
 │  │  │  ├─ css
 │  │  │  │  ├─ dashboard.css
+│  │  │  │  ├─ tablero_cir.css
+│  │  │  │  ├─ tablero_cir_pub.css
 │  │  │  │  ├─ tablero_hos.css
-│  │  │  │  └─ tablero_uci.css
+│  │  │  │  ├─ tablero_uci.css
+│  │  │  │  ├─ tablero_urg.css
+│  │  │  │  └─ vista_paciente.css
 │  │  │  └─ js
+│  │  │     ├─ config_tablero.js
+│  │  │     ├─ DragDropTouch.js
 │  │  │     ├─ indicadores.js
 │  │  │     ├─ indicadores_hos.js
+│  │  │     ├─ indicadores_urg,js
+│  │  │     ├─ tablero_cir.js
+│  │  │     ├─ tablero_cir_pub.js
 │  │  │     ├─ tablero_hos.js
-│  │  │     └─ tablero_uci.js
+│  │  │     ├─ tablero_uci.js
+│  │  │     ├─ tablero_urg.js
+│  │  │     └─ vista_paciente.js
 │  │  └─ urgencias
 │  │     ├─ css
 │  │     │  └─ dashboard.css
@@ -108,7 +111,7 @@ app_flask
 │  │        └─ dashboard.js
 │  ├─ templates
 │  │  ├─ base.html
-│  │  ├─ cirugia1
+│  │  ├─ cirugia
 │  │  │  └─ dashboard.html
 │  │  ├─ facturacion
 │  │  │  └─ dashboard.html
@@ -119,16 +122,15 @@ app_flask
 │  │  ├─ index.html
 │  │  ├─ tableros
 │  │  │  ├─ dashboard.html
+│  │  │  ├─ tablero_cir.html
+│  │  │  ├─ tablero_cir_pub.html
 │  │  │  ├─ tablero_hos.html
-│  │  │  └─ tablero_uci.html
+│  │  │  ├─ tablero_uci.html
+│  │  │  ├─ tablero_urg.html
+│  │  │  └─ vista_paciente.html
 │  │  └─ urgencias1
 │  │     └─ dashboard.html
-│  ├─ __init__.py
-│  └─ __pycache__
-│     ├─ celery_worker.cpython-311.pyc
-│     ├─ db_engine.cpython-311.pyc
-│     ├─ extensions.cpython-311.pyc
-│     └─ __init__.cpython-311.pyc
+│  └─ __init__.py
 └─ __pycache__
    └─ run.cpython-311.pyc
 

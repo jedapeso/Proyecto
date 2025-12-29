@@ -146,7 +146,8 @@ def procesar_xml_profix(df):
             
             # Recorrer todos los Row del XML
             for row in root.findall('.//Row'):
-                item_cell = row.find('.//Cell[@ColumnCode="ITEM"]')
+                item_cell = row.find('./'
+                '/Cell[@ColumnCode="ITEM"]')
                 
                 if item_cell is not None:
                     item_value = item_cell.find('Value')
