@@ -18,11 +18,11 @@
 </head>
 <body class="h-screen">
     <div class="container">
-        <header class="header mb-6 flex justify-between items-center">
-            <h1>Monitorización de riesgos en tiempo real - Urgencias</h1>
-            <div class="flex gap-2">
+        <header class="header mb-6 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+            <h1 class="text-2xl md:text-3xl">Monitorización de riesgos en tiempo real - Urgencias</h1>
+            <div class="flex flex-wrap gap-2 justify-center md:justify-end">
                 {% for u in servicios %}
-                <button class="ubicacion-btn px-4 py-2 rounded-lg font-semibold text-sm transition-all border-2" 
+                <button class="ubicacion-btn px-3 py-2 md:px-4 rounded-lg font-semibold text-xs md:text-sm transition-all border-2 whitespace-nowrap" 
                         data-tipo="{{ u.ubicod }}"
                         style="background: white; border-color: #d1d5db; color: #6b7280;">
                     {{ u.ubinom }}
@@ -31,47 +31,47 @@
             </div>
         </header>
 
-        <section class="flex flex-col md:flex-row items-stretch justify-center gap-6 mb-6">
-            <div class="bg-white shadow rounded-lg p-3 text-center md:w-1/6 flex flex-col justify-center">
-                <h3 class="text-base font-medium text-gray-600 mb-2">
+        <section class="flex flex-col lg:flex-row items-stretch justify-center gap-4 md:gap-6 mb-6">
+            <div class="bg-white shadow rounded-lg p-3 text-center lg:w-1/6 flex flex-col justify-center">
+                <h3 class="text-sm md:text-base font-medium text-gray-600 mb-2">
                     Total Pacientes
                 </h3>
-                <p id="total-pacientes" class="text-5xl font-bold text-gray-700">0</p>
+                <p id="total-pacientes" class="text-4xl md:text-5xl font-bold text-gray-700">0</p>
             </div>
 
-            <div class="bg-white shadow rounded-lg p-2 overflow-x-auto md:w-4/6 flex flex-col justify-center">
+            <div class="bg-white shadow rounded-lg p-2 overflow-x-auto lg:w-4/6 flex flex-col justify-center">
                 <table class="w-full text-xs text-center border-collapse">
                     <thead class="bg-gray-100 text-gray-700 uppercase">
                     <tr>
-                        <th colspan="2" class="px-2 py-1 border">Escala GRACE</th>
-                        <th colspan="2" class="px-2 py-1 border">Riesgo CURB-65</th>
-                        <th colspan="2" class="px-2 py-1 border">Riesgo de Caída</th>
-                        <th colspan="2" class="px-2 py-1 border">Escala NIHSS</th>
+                        <th colspan="2" class="px-1 md:px-2 py-1 border text-xs">Escala GRACE</th>
+                        <th colspan="2" class="px-1 md:px-2 py-1 border text-xs">Riesgo CURB-65</th>
+                        <th colspan="2" class="px-1 md:px-2 py-1 border text-xs">Riesgo de Caída</th>
+                        <th colspan="2" class="px-1 md:px-2 py-1 border text-xs">Escala NIHSS</th>
                     </tr>
                     <tr>
-                        <th class="px-2 py-1 border">#Pacientes</th>
-                        <th class="px-2 py-1 border">Clasificación</th>
-                        <th class="px-2 py-1 border">#Pacientes</th>
-                        <th class="px-2 py-1 border">Nivel</th>
-                        <th class="px-2 py-1 border">#Pacientes</th>
-                        <th class="px-2 py-1 border">Riesgo</th>
-                        <th class="px-2 py-1 border">#Pacientes</th>
-                        <th class="px-2 py-1 border">Severidad</th>
+                        <th class="px-1 md:px-2 py-1 border text-xs">#Pacientes</th>
+                        <th class="px-1 md:px-2 py-1 border text-xs">Clasificación</th>
+                        <th class="px-1 md:px-2 py-1 border text-xs">#Pacientes</th>
+                        <th class="px-1 md:px-2 py-1 border text-xs">Nivel</th>
+                        <th class="px-1 md:px-2 py-1 border text-xs">#Pacientes</th>
+                        <th class="px-1 md:px-2 py-1 border text-xs">Riesgo</th>
+                        <th class="px-1 md:px-2 py-1 border text-xs">#Pacientes</th>
+                        <th class="px-1 md:px-2 py-1 border text-xs">Severidad</th>
                     </tr>
                     </thead>
                     <tbody id="tabla-indicadores"></tbody>
                 </table>
             </div>
 
-            <div class="bg-white shadow rounded-lg p-3 text-center md:w-1/6 flex flex-col justify-center">
-                <h3 class="text-base font-medium text-gray-600 mb-2">Promedio Estancia</h3>
-                <p id="promedio-estancia" class="text-3xl font-bold text-gray-700">0</p>
+            <div class="bg-white shadow rounded-lg p-3 text-center lg:w-1/6 flex flex-col justify-center">
+                <h3 class="text-sm md:text-base font-medium text-gray-600 mb-2">Promedio Estancia</h3>
+                <p id="promedio-estancia" class="text-2xl md:text-3xl font-bold text-gray-700">0</p>
             </div>
         </section>
 
         <section class="pager-wrapper flex items-center justify-between mb-4">
             <button id="prevPage" class="page-btn" aria-label="Página anterior" title="Anterior">&#10094;</button>
-            <div id="contenedor-tarjetas" class="cards-container grid-2x4 flex-1 mx-4"></div>
+            <div id="contenedor-tarjetas" class="cards-container grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 flex-1 mx-4"></div>
             <button id="nextPage" class="page-btn" aria-label="Página siguiente" title="Siguiente">&#10095;</button>
         </section>
 

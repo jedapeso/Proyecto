@@ -116,6 +116,18 @@ body {
     gap: 8px;
 }
 
+.btn-ghost {
+    background: #fff;
+    border: 1px solid var(--border-color);
+    color: var(--text-dark);
+    padding: 8px 12px;
+}
+
+.btn-ghost:hover {
+    background: #f3f4f6;
+    border-color: #cbd5e1;
+}
+
 .btn-primary {
     background: linear-gradient(135deg, var(--color-primary), #0277BD);
     color: white;
@@ -185,6 +197,10 @@ body {
 
 .stat-card.total {
     border-color: var(--color-primary);
+}
+
+.stats-hidden {
+    display: none;
 }
 
 .stat-card i {
@@ -916,7 +932,25 @@ body {
     }
     
     .stats-bar {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(2, minmax(140px, 1fr));
+    }
+}
+
+/* Tablets horizontales y medianas: liberar espacio y evitar header pegado */
+@media (max-width: 1366px) {
+    .header-principal {
+        position: static;
+        top: auto;
+    }
+
+    .header-content {
+        padding: 14px 20px;
+    }
+
+    .stats-bar {
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 12px;
+        padding: 12px 20px;
     }
 }
 
@@ -931,7 +965,34 @@ body {
     }
     
     .stats-bar {
-        grid-template-columns: 1fr;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 10px;
+        padding: 12px 16px;
+        overflow-x: auto;
+    }
+
+    .stats-bar::-webkit-scrollbar {
+        height: 6px;
+    }
+
+    .stats-bar::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 999px;
+    }
+
+    .header-principal {
+        position: static;
+        top: auto;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .header-content {
+        padding: 12px 16px;
+    }
+
+    .stat-card {
+        padding: 10px 12px;
     }
 
     /* Toggle responsive */

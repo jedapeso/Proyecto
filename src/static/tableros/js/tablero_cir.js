@@ -419,6 +419,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Toggle barra de estadísticas para ganar espacio en tabletas
+  const toggleStatsBtn = document.getElementById('toggle-stats');
+  const statsBar = document.querySelector('.stats-bar');
+  if (toggleStatsBtn && statsBar) {
+    toggleStatsBtn.addEventListener('click', () => {
+      const hidden = statsBar.classList.toggle('stats-hidden');
+      toggleStatsBtn.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+      const label = toggleStatsBtn.querySelector('.btn-label');
+      if (label) label.textContent = hidden ? 'Mostrar barra' : 'Ocultar barra';
+    });
+  }
+
   const buscarModalInput = document.getElementById('buscar-paciente-modal');
   if (buscarModalInput) {
     buscarModalInput.addEventListener('input', (e) => {
