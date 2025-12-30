@@ -2,6 +2,7 @@ from flask import render_template, request, jsonify
 from src import engine
 from sqlalchemy import text
 from datetime import datetime
+import time
 import os
 import traceback
 from dotenv import load_dotenv
@@ -22,22 +23,14 @@ else:
 def tablero_urg():
     try:
         with engine.begin() as conn:
-            # Consultar directamente con CASE statement
+            # Usar SP para cargar ubicaciones y evitar duplicar lógica en el BP
+            conn.execute(text("EXECUTE PROCEDURE SP_ubica_urgd()"))
             result = conn.execute(text("""
-                SELECT DISTINCT 
-                    CASE WHEN HABCOD IN ('CON1','CON2','CON3','CECO') THEN 'CONSULTORIOS' 
-                         WHEN HABCOD IN ('C1O1','C2O1','C301','C4O1','C5O1','C6O1') THEN 'OBSERVACION 1' 
-                         WHEN HABCOD IN ('C1O2','C2O2','C302','C4O2','C5O2','C6O2') THEN 'OBSERVACION 2'
-                         WHEN HABCOD IN ('REAN','PEQC','REA1','SER1','SER2') THEN 'SALAS' END AS UBICA,
-                    CASE WHEN HABCOD IN ('CON1','CON2','CON3','CECO') THEN 1
-                         WHEN HABCOD IN ('C1O1','C2O1','C301','C4O1','C5O1','C6O1') THEN 2
-                         WHEN HABCOD IN ('C1O2','C2O2','C302','C4O2','C5O2','C6O2') THEN 3
-                         WHEN HABCOD IN ('REAN','PEQC','REA1','SER1','SER2') THEN 4 END AS TIPO
-                FROM INHAB 
-                WHERE HABACT = 'S' AND HABUBI = 'UR'
+                SELECT DISTINCT UBICA, TIPO
+                FROM UBICA1
                 ORDER BY TIPO
-            """))
-            servicios = [{'ubicod': row[1], 'ubinom': row[0]} for row in result]
+            """)).mappings()
+            servicios = [{'ubicod': row['tipo'], 'ubinom': row['ubica']} for row in result]
         return render_template('tableros/tablero_urg.html', servicios=servicios)
     except Exception as e:
         print(f"Error carga servicios: {e}")
@@ -212,11 +205,18 @@ def obtener_riesgos_necesidades_urg():
 
             # ⚙️ Ejecuta SP de riesgos/necesidades
             conn.execute(
-                text("EXECUTE PROCEDURE SP_Riesgos_Necesidadesurgd(:ESCEPI)"),
+                text("EXECUTE PROCEDURE SP_Riesgos_Necesidadesd(:ESCEPI)"),
                 {"ESCEPI": escepi}
             )
 
-            filas = conn.execute(text("SELECT LISTAS FROM RESUMENURG1")).fetchall()
+            filas = conn.execute(text("SELECT LISTAS FROM RESUMEN1")).fetchall()
+            # Reintentos con delays progresivos por si el SP tarda en poblar RESUMEN1
+            if not filas:
+                for intento in [0.25, 0.50, 0.75]:
+                    time.sleep(intento)
+                    filas = conn.execute(text("SELECT LISTAS FROM RESUMEN1")).fetchall()
+                    if filas:
+                        break
 
         if not filas:
             return jsonify({
@@ -224,7 +224,7 @@ def obtener_riesgos_necesidades_urg():
                 "nombre": nombre,
                 "habitacion": habitacion,
                 "diagnostico": diagnostico,
-                "resumen_ia": "No se encontraron riesgos o necesidades."
+                "resumen_ia": "No se ha diligenciado listas de chequeo de Riesgos y Necesidades para el paciente."
             })
 
         riesgos_texto = " ".join(f[0] for f in filas if f[0])

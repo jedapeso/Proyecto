@@ -147,10 +147,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const esceda = item.esceda ?? "";
     const escpac = item.escpac ?? "";
     const eschab = item.eschab ?? "";
-    const diaest = item.diaest ?? "";
-    const diaesg = item.diaesg ?? "";
+    const diaest = item.diaest ?? ""; // Estancia detallada
+    const diaesg = item.diaesg ?? ""; // Estancia general
+    const diagnostico = item.escdia ?? "";
     
-    const graceTexto = item.esgint || item.escgra || 'Sin Dato';
+    const graceTexto = item.esgint || item.escgra || '-';
     const graceColor = normalizeColor(item.esgrgb || '#cccccc');
     const curbTexto = item.escint || item.esccur || '-';
     const curbColor = normalizeColor(item.escrgb || '#cccccc');
@@ -171,7 +172,6 @@ document.addEventListener('DOMContentLoaded', () => {
             ${esceda ? `&nbsp;&nbsp;<span class="patient-age">(${escapeHtml(esceda)} AÑOS)</span>` : ""}
           </div>
           <div class="patient-name">${escapeHtml(escpac)}</div>
-          <div style="font-size:11px; color:#666;">Gral: ${diaesg}</div>
         </div>
 
         <div class="${roomClasses.join(" ")}">
@@ -182,6 +182,8 @@ document.addEventListener('DOMContentLoaded', () => {
           ${escapeHtml(eschab)}
         </div>
       </div>
+
+      ${diagnostico ? `<div class="patient-dx" title="Diagnóstico"><span class="patient-dx-label">Diagnóstico:</span> ${escapeHtml(diagnostico)}</div>` : ""}
 
       <div class="risks-container">
         <div class="risk-item" style="border-left-color: ${graceColor}">
@@ -214,7 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       </div>
 
-      <div class="stay-info"></div>
+      <div class="stay-info">${diaesg ? `Gral: ${escapeHtml(diaesg)}` : ""}</div>
     </div>
     `;
   }
@@ -349,6 +351,50 @@ document.addEventListener('DOMContentLoaded', () => {
   prevBtn.addEventListener("click", () => prevPageFn(true));
   nextBtn.addEventListener("click", () => nextPage(true));
 
+  // Swipe para pasar páginas en touch
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let touchStartTime = 0;
+
+  contenedor.addEventListener("touchstart", (e) => {
+    if (!e.touches || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    touchStartX = t.clientX;
+    touchStartY = t.clientY;
+    touchStartTime = Date.now();
+  }, { passive: true });
+
+  contenedor.addEventListener("touchend", (e) => {
+    if (!e.changedTouches || e.changedTouches.length !== 1) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touchStartX;
+    const dy = t.clientY - touchStartY;
+    const dt = Date.now() - touchStartTime;
+
+    // Requiere gesto rápido predominantemente horizontal
+    if (Math.abs(dx) < 40 || Math.abs(dy) > 50 || dt > 800) return;
+
+    if (dx < 0) nextPage(true);
+    else prevPageFn(true);
+  }, { passive: true });
+
+  function typeWriter(element, text, speed = 15) {
+    let i = 0;
+    element.textContent = "";
+    element.classList.add("typing-effect");
+    
+    function type() {
+      if (i < text.length) {
+        element.textContent += text.charAt(i);
+        i++;
+        setTimeout(type, speed);
+      } else {
+        element.classList.remove("typing-effect");
+      }
+    }
+    type();
+  }
+
   contenedor.addEventListener("click", async (e) => {
     const card = e.target.closest(".hos-card");
     if (!card) return;
@@ -356,7 +402,16 @@ document.addEventListener('DOMContentLoaded', () => {
     window.modalOpen = true;
     stopIntervals();
     modal.classList.remove("hidden");
-    contenidoResumen.innerHTML = "";
+    contenidoResumen.innerHTML = `
+      <div class="loading-skeleton">
+        <div class="skeleton-header"></div>
+        <div class="skeleton-lines">
+          <div class="skeleton-line"></div>
+          <div class="skeleton-line"></div>
+          <div class="skeleton-line short"></div>
+        </div>
+      </div>
+    `;
     const loadingDiv = document.getElementById("modal-loading");
     if (loadingDiv) loadingDiv.classList.remove("hidden");
     if (currentAbortController) currentAbortController.abort();
@@ -373,20 +428,33 @@ document.addEventListener('DOMContentLoaded', () => {
       if (data.error) {
         contenidoResumen.innerHTML = `<div class="p-4 text-red-600 font-semibold">⚠️ ${data.error}</div>`;
       } else {
+        const resumenTexto = escapeHtml(data.resumen_ia || "Sin información disponible.");
         contenidoResumen.innerHTML = `
-          <div class="space-y-4">
-            <div class="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg shadow-sm">
-              <p><span class="font-semibold">Identificación:</span> ${escapeHtml(data.escide)}</p>
-              <p><span class="font-semibold">Nombre:</span> ${escapeHtml(data.nombre)}</p>
-              <p><span class="font-semibold">Habitación:</span> ${escapeHtml(data.habitacion)}</p>
-              <p><span class="font-semibold">Diagnóstico:</span> ${escapeHtml(data.diagnostico)}</p>
+          <div class="space-y-4 fade-in-content">
+            <div class="grid grid-cols-2 gap-4 bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-xl shadow-sm border border-blue-100">
+              <p class="flex items-center gap-2"><span class="font-semibold text-blue-900">🆔 Identificación:</span> <span class="text-gray-700">${escapeHtml(data.escide)}</span></p>
+              <p class="flex items-center gap-2"><span class="font-semibold text-blue-900">👤 Nombre:</span> <span class="text-gray-700">${escapeHtml(data.nombre)}</span></p>
+              <p class="flex items-center gap-2"><span class="font-semibold text-blue-900">🏥 Habitación:</span> <span class="text-gray-700">${escapeHtml(data.habitacion)}</span></p>
+              <p class="flex items-center gap-2"><span class="font-semibold text-blue-900">📋 Diagnóstico:</span> <span class="text-gray-700">${escapeHtml(data.diagnostico)}</span></p>
             </div>
-            <div class="p-4 bg-white border rounded-lg shadow">
-              <h3 class="text-lg font-semibold mb-2">📋 Riesgos y Necesidades del Paciente</h3>
-              <p class="text-gray-700 whitespace-pre-line">${escapeHtml(data.resumen_ia || "Sin información disponible.")}</p>
+            <div class="p-5 bg-white border-2 border-indigo-100 rounded-xl shadow-lg">
+              <div class="flex items-center gap-3 mb-4 pb-3 border-b border-gray-200">
+                <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center shadow-md">
+                  <span class="text-white text-xl">🤖</span>
+                </div>
+                <h3 class="text-lg font-bold text-gray-800">Análisis Inteligente - Riesgos y Necesidades</h3>
+              </div>
+              <div class="ai-response-container bg-gradient-to-br from-gray-50 to-blue-50 p-4 rounded-lg">
+                <p class="text-gray-700 whitespace-pre-line leading-relaxed" id="ai-text-output"></p>
+              </div>
             </div>
           </div>
         `;
+        
+        const outputElement = document.getElementById("ai-text-output");
+        if (outputElement) {
+          typeWriter(outputElement, resumenTexto, 8);
+        }
       }
     } catch (err) {
       if (err.name === "AbortError") {
