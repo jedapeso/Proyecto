@@ -151,8 +151,14 @@ function startAutoRefreshIndicadoresUrg(ubicods) {
   stopAutoRefreshIndicadoresUrg();
   if (!ubicods || (Array.isArray(ubicods) && ubicods.length === 0)) return;
   refreshIntervalIndicadores = setInterval(() => {
-    if (!window.modalOpen) fetchIndicadoresUrg(ubicods);
-  }, 60000);
+    if (!window.modalOpen) {
+      const botonesActivos = document.querySelectorAll('.ubicacion-btn.activo');
+      const ubicodsActuales = Array.from(botonesActivos).map(b => b.dataset.tipo);
+      if (ubicodsActuales.length > 0) {
+        fetchIndicadoresUrg(ubicodsActuales);
+      }
+    }
+  }, 5000);
 }
 function stopAutoRefreshIndicadoresUrg() {
   if (refreshIntervalIndicadores) clearInterval(refreshIntervalIndicadores);

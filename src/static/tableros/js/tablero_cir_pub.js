@@ -515,6 +515,12 @@ function renderColumna(contenedor, pacientes) {
     });
 }
 
+// ========== VARIABLES DE TIMEOUT ==========
+let timeoutClaveInterval = null;
+let timeoutQRInterval = null;
+let tiempoRestanteClave = 20;
+let tiempoRestanteQR = 20;
+
 // ========== SELECCIONAR PACIENTE ==========
 function seleccionarPaciente(paciente) {
     pacienteSeleccionado = paciente;
@@ -523,6 +529,36 @@ function seleccionarPaciente(paciente) {
     document.getElementById('errorClave').textContent = '';
    
     setTimeout(() => document.getElementById('inputClave').focus(), 100);
+    
+    // Iniciar contador de 20 segundos para cerrar modal automáticamente
+    iniciarTimeoutClave();
+}
+
+// ========== INICIAR TIMEOUT PARA MODAL DE CLAVE ==========
+function iniciarTimeoutClave() {
+    // Limpiar cualquier timeout anterior
+    if (timeoutClaveInterval) {
+        clearInterval(timeoutClaveInterval);
+    }
+    
+    tiempoRestanteClave = 20;
+    document.getElementById('tiempoRestanteClave').textContent = '20';
+    document.getElementById('progressBarClave').style.width = '100%';
+    
+    timeoutClaveInterval = setInterval(() => {
+        tiempoRestanteClave--;
+        document.getElementById('tiempoRestanteClave').textContent = tiempoRestanteClave;
+        
+        // Actualizar barra de progreso (de 100% a 0%)
+        const porcentaje = (tiempoRestanteClave / 20) * 100;
+        document.getElementById('progressBarClave').style.width = porcentaje + '%';
+        
+        // Cuando llega a 0, cerrar modal
+        if (tiempoRestanteClave <= 0) {
+            clearInterval(timeoutClaveInterval);
+            cerrarModalClave();
+        }
+    }, 1000);
 }
 
 // ========== VALIDAR CLAVE ==========
@@ -548,11 +584,16 @@ function validarClave() {
         document.getElementById('inputClave').focus();
         return;
     }
+    
+    // Limpiar timeout al validar exitosamente
+    if (timeoutClaveInterval) {
+        clearInterval(timeoutClaveInterval);
+    }
    
     generarQRPersonalizado();
 }
 
-// ========== GENERAR QR ==========
+// ========== GENERAR QR Y ENLACE TEMPORAL ==========
 function generarQRPersonalizado() {
     fetch(`/tableros/cirugia/generar-qr/${pacienteSeleccionado.identificacion}`)
         .then(r => r.json())
@@ -561,7 +602,14 @@ function generarQRPersonalizado() {
                 document.getElementById('modalClave').style.display = 'none';
                 document.getElementById('imagenQR').src = data.qr_image;
                 document.getElementById('nombrePacienteQR').textContent = pacienteSeleccionado.nombre;
+                
+                // Usar la URL con token que retorna el backend (misma que el QR)
+                document.getElementById('enlaceAcceso').href = data.url;
+                
                 document.getElementById('modalQR').style.display = 'flex';
+                
+                // Iniciar timeout para modal QR
+                iniciarTimeoutQR();
             } else {
                 mostrarError('Error al generar código QR: ' + (data.error || 'Desconocido'));
             }
@@ -571,6 +619,35 @@ function generarQRPersonalizado() {
             mostrarError('Error de conexión al generar QR');
         });
 }
+
+// ========== INICIAR TIMEOUT PARA MODAL QR ==========
+function iniciarTimeoutQR() {
+    // Limpiar cualquier timeout anterior
+    if (timeoutQRInterval) {
+        clearInterval(timeoutQRInterval);
+    }
+    
+    tiempoRestanteQR = 20;
+    document.getElementById('tiempoRestanteQR').textContent = '20';
+    document.getElementById('progressBarQR').style.width = '100%';
+    
+    timeoutQRInterval = setInterval(() => {
+        tiempoRestanteQR--;
+        document.getElementById('tiempoRestanteQR').textContent = tiempoRestanteQR;
+        
+        // Actualizar barra de progreso (de 100% a 0%)
+        const porcentaje = (tiempoRestanteQR / 20) * 100;
+        document.getElementById('progressBarQR').style.width = porcentaje + '%';
+        
+        // Cuando llega a 0, cerrar modal
+        if (tiempoRestanteQR <= 0) {
+            clearInterval(timeoutQRInterval);
+            cerrarModalQR();
+        }
+    }, 1000);
+}
+
+
 
 // ========== MOSTRAR ERROR ==========
 function mostrarError(mensaje) {
@@ -582,11 +659,21 @@ function mostrarError(mensaje) {
 
 // ========== CERRAR MODALES ==========
 function cerrarModalClave() {
+    // Limpiar timeout
+    if (timeoutClaveInterval) {
+        clearInterval(timeoutClaveInterval);
+    }
+    
     document.getElementById('modalClave').style.display = 'none';
     pacienteSeleccionado = null;
 }
 
 function cerrarModalQR() {
+    // Limpiar timeout
+    if (timeoutQRInterval) {
+        clearInterval(timeoutQRInterval);
+    }
+    
     document.getElementById('modalQR').style.display = 'none';
     pacienteSeleccionado = null;
 }

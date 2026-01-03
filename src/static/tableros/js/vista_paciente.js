@@ -107,7 +107,7 @@ function validarAccesoConTokenConTimeout() {
     .then(data => {
         if (data.success) {
             iniciarVistaPaciente(data.paciente);
-            intervalo = setInterval(() => actualizarEstadoConToken(), 5000);
+            intervalo = setInterval(() => actualizarEstadoConToken(), 2000);
         } else {
             throw new Error(data.error || 'Token inválido');
         }
@@ -139,7 +139,7 @@ function validarAcceso() {
     .then(data => {
         if (data.success) {
             iniciarVistaPaciente(data.paciente);
-            intervalo = setInterval(() => actualizarEstadoConClave(), 5000);
+            intervalo = setInterval(() => actualizarEstadoConClave(), 2000);
         } else {
             mostrarError('Clave incorrecta');
         }

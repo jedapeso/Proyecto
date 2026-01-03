@@ -2,6 +2,14 @@
 
 import { fetchIndicadoresUrg, startAutoRefreshIndicadoresUrg, stopAutoRefreshIndicadoresUrg, actualizarIndicadoresUrg } from './indicadores_urg.js';
 
+// Configuración centralizada
+const CONFIG = {
+  REFRESH_INTERVAL: 5000,    // Refresco automático cada 5 segundos
+  PAGE_INTERVAL: 20000,       // Cambio de página cada 20 segundos
+  PERPAGE: 8,                 // Tarjetas por página
+  UPDATE_TIME_INTERVAL: 60000 // Actualizar reloj cada minuto
+};
+
 document.addEventListener('DOMContentLoaded', () => {
 
   function normalizeColor(value) {
@@ -21,6 +29,21 @@ document.addEventListener('DOMContentLoaded', () => {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
+  }
+
+  function markdownToHtml(text) {
+    if (!text) return '';
+    return text
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/__(.+?)__/g, '<strong>$1</strong>')
+      .replace(/(?<!\*)\*(?!\*)(.+?)\*(?!\*)/g, '<em>$1</em>')
+      .replace(/(?<!_)_(?!_)(.+?)_(?!_)/g, '<em>$1</em>')
+      .replace(/^---$/gm, '<hr>')
+      .replace(/^\*\*\*$/gm, '<hr>')
+      .replace(/^[\*\-]\s+(.+)$/gm, '<li>$1</li>')
+      .replace(/^###\s+(.+)$/gm, '<h3>$1</h3>')
+      .replace(/^##\s+(.+)$/gm, '<h2>$1</h2>')
+      .replace(/^#\s+(.+)$/gm, '<h1>$1</h1>');
   }
 
   const botonesUbicacion = document.querySelectorAll('.ubicacion-btn');
@@ -46,7 +69,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let items = [];
   let currentPage = 1;
-  const PERPAGE = 8;
+  let lastHash = null;
+  let isFetching = false;
 
   function stopIntervals() {
     if (refreshInterval) clearInterval(refreshInterval);
@@ -59,26 +83,24 @@ document.addEventListener('DOMContentLoaded', () => {
     pageTimeout = null;
   }
 
-  function startIntervals() {
+  function startIntervals(skipInitial = false) {
     stopIntervals();
     const botonesActivos = document.querySelectorAll('.ubicacion-btn.activo');
     const ubicods = Array.from(botonesActivos).map(b => b.dataset.tipo);
     if (!window.modalOpen && ubicods.length > 0) {
-      fetchDatos(ubicods);
-      const ahora = new Date();
-      const msHastaProximoMinuto = (60 - ahora.getSeconds()) * 1000 - ahora.getMilliseconds();
-      refreshTimeout = setTimeout(() => {
-        const botonesNow = document.querySelectorAll('.ubicacion-btn.activo');
-        const selectedNow = Array.from(botonesNow).map(b => b.dataset.tipo);
-        fetchDatos(selectedNow);
-        refreshInterval = setInterval(() => {
-          if (!window.modalOpen) {
-            const botonesCurrent = document.querySelectorAll('.ubicacion-btn.activo');
-            const selected = Array.from(botonesCurrent).map(b => b.dataset.tipo);
-            fetchDatos(selected);
+      if (!skipInitial) {
+        fetchDatos(ubicods, false);
+      }
+      // Refresco automático
+      refreshInterval = setInterval(() => {
+        if (!window.modalOpen) {
+          const botonesCurrent = document.querySelectorAll('.ubicacion-btn.activo');
+          const selected = Array.from(botonesCurrent).map(b => b.dataset.tipo);
+          if (selected.length > 0) {
+            fetchDatos(selected, true);
           }
-        }, 60000);
-      }, msHastaProximoMinuto);
+        }
+      }, CONFIG.REFRESH_INTERVAL);
     }
     resetPageTimer();
   }
@@ -114,7 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const msHastaMinuto = (60 - ahora.getSeconds()) * 1000 - ahora.getMilliseconds();
     updateTimeTimeout = setTimeout(() => {
       actualizarUltimaHora();
-      updateTimeInterval = setInterval(actualizarUltimaHora, 60000);
+      updateTimeInterval = setInterval(actualizarUltimaHora, CONFIG.UPDATE_TIME_INTERVAL);
     }, msHastaMinuto);
   }
 
@@ -138,8 +160,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       pageInterval = setInterval(() => {
         if (!window.modalOpen && items.length > 0) nextPage(false);
-      }, 18000);
-    }, 18000);
+      }, CONFIG.PAGE_INTERVAL);
+    }, CONFIG.PAGE_INTERVAL);
   }
 
   function buildCard(item) {
@@ -222,7 +244,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function totalPages() {
-    return Math.max(1, Math.ceil(items.length / PERPAGE));
+    return Math.max(1, Math.ceil(items.length / CONFIG.PERPAGE));
   }
 
   function updatePager(page, total) {
@@ -231,7 +253,7 @@ document.addEventListener('DOMContentLoaded', () => {
     nextBtn.disabled = total === 0 || page >= total;
   }
 
-  function renderPage(animate = true) {
+  function renderPage() {
     const total = totalPages();
     if (!items.length) {
       contenedor.innerHTML = `<div class="hos-state hos-empty">Sin pacientes para la ubicación seleccionada.</div>`;
@@ -240,46 +262,40 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (currentPage < 1) currentPage = 1;
     if (currentPage > total) currentPage = total;
-    const start = (currentPage - 1) * PERPAGE;
-    const end = start + PERPAGE;
+    const start = (currentPage - 1) * CONFIG.PERPAGE;
+    const end = start + CONFIG.PERPAGE;
     const slice = items.slice(start, end);
     const fragment = document.createDocumentFragment();
     const wrapper = document.createElement("div");
     wrapper.innerHTML = slice.map(buildCard).join("");
     Array.from(wrapper.children).forEach(child => fragment.appendChild(child));
-    if (animate) {
-      contenedor.classList.add("fade-out");
-      setTimeout(() => {
-        contenedor.innerHTML = "";
-        contenedor.appendChild(fragment);
-        contenedor.classList.remove("fade-out");
-        contenedor.classList.add("fade-in");
-        updatePager(currentPage, total);
-      }, 200);
-    } else {
-      contenedor.innerHTML = "";
-      contenedor.appendChild(fragment);
-      updatePager(currentPage, total);
-    }
+    contenedor.innerHTML = "";
+    contenedor.appendChild(fragment);
+    updatePager(currentPage, total);
   }
 
   function nextPage(manual = true) {
     if (currentPage < totalPages()) currentPage++;
     else currentPage = 1;
-    renderPage(true);
+    renderPage();
     if (manual) resetPageTimer();
   }
 
   function prevPageFn(manual = true) {
     if (currentPage > 1) currentPage--;
     else currentPage = totalPages();
-    renderPage(true);
+    renderPage();
     if (manual) resetPageTimer();
   }
 
-  async function fetchDatos(ubicods) {
-    contenedor.innerHTML = `<div class="hos-state hos-loading"><div class="loading-spinner"></div><div>Cargando pacientes...</div></div>`;
-    updatePager(0, 0);
+  async function fetchDatos(ubicods, isAutoRefresh = false) {
+    if (isFetching && isAutoRefresh) return;
+    isFetching = true;
+    const showLoading = !isAutoRefresh && items.length === 0;
+    if (showLoading) {
+      contenedor.innerHTML = `<div class="hos-state hos-loading"><div class="loading-spinner"></div><div>Cargando pacientes...</div></div>`;
+      updatePager(0, 0);
+    }
     try {
       const resp = await fetch("/tableros/urgencias/datos", {
         method: "POST",
@@ -289,19 +305,33 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await resp.json();
       const raw = Array.isArray(data?.pacientes_en_cama) ? data.pacientes_en_cama
                  : Array.isArray(data?.datos) ? data.datos : [];
-      items = raw.map(obj => {
+      const normalized = raw.map(obj => {
         const norm = {};
         for (let k in obj) norm[k.toLowerCase()] = obj[k];
         return norm;
       });
-      currentPage = 1;
-      renderPage(false);
-      fetchIndicadoresUrg(ubicods);
+      const hash = JSON.stringify(normalized);
+      if (isAutoRefresh && lastHash && hash === lastHash) {
+        actualizarUltimaHora();
+        return;
+      }
+      items = normalized;
+      lastHash = hash;
+      if (currentPage > totalPages()) currentPage = totalPages();
+      renderPage();
+      resetPageTimer();
+      if (!isAutoRefresh) {
+        fetchIndicadoresUrg(ubicods);
+      }
       actualizarUltimaHora();
     } catch (err) {
       console.error("❌ Error en fetchDatos:", err);
-      contenedor.innerHTML = `<div class="hos-state hos-error">Error al cargar pacientes</div>`;
-      updatePager(0, 0);
+      if (items.length === 0) {
+        contenedor.innerHTML = `<div class="hos-state hos-error">Error al cargar pacientes</div>`;
+        updatePager(0, 0);
+      }
+    } finally {
+      isFetching = false;
     }
   }
 
@@ -340,8 +370,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       
-      fetchDatos(ubicods).then(() => {
-        startIntervals();
+      fetchDatos(ubicods, false).then(() => {
+        startIntervals(true);
         startUpdateTimeTicker();
         startAutoRefreshIndicadoresUrg(ubicods);
       });
@@ -378,16 +408,28 @@ document.addEventListener('DOMContentLoaded', () => {
     else prevPageFn(true);
   }, { passive: true });
 
-  function typeWriter(element, text, speed = 15) {
+  function typeWriter(element, htmlContent) {
+    // Si viene HTML (Markdown convertido), lo insertamos completo con fade-in
+    if (htmlContent.includes('<') || htmlContent.includes('>')) {
+      element.innerHTML = htmlContent;
+      element.style.opacity = '0';
+      setTimeout(() => {
+        element.style.transition = 'opacity 0.8s ease-in';
+        element.style.opacity = '1';
+      }, 50);
+      return;
+    }
+
+    // Texto plano: efecto tipo máquina
     let i = 0;
     element.textContent = "";
     element.classList.add("typing-effect");
     
     function type() {
-      if (i < text.length) {
-        element.textContent += text.charAt(i);
+      if (i < htmlContent.length) {
+        element.textContent += htmlContent.charAt(i);
         i++;
-        setTimeout(type, speed);
+        setTimeout(type, 15);
       } else {
         element.classList.remove("typing-effect");
       }
@@ -428,7 +470,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (data.error) {
         contenidoResumen.innerHTML = `<div class="p-4 text-red-600 font-semibold">⚠️ ${data.error}</div>`;
       } else {
-        const resumenTexto = escapeHtml(data.resumen_ia || "Sin información disponible.");
+        const resumenTexto = markdownToHtml(data.resumen_ia || "Sin información disponible.");
         contenidoResumen.innerHTML = `
           <div class="space-y-4 fade-in-content">
             <div class="grid grid-cols-2 gap-4 bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-xl shadow-sm border border-blue-100">
@@ -453,7 +495,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const outputElement = document.getElementById("ai-text-output");
         if (outputElement) {
-          typeWriter(outputElement, resumenTexto, 8);
+          typeWriter(outputElement, resumenTexto);
         }
       }
     } catch (err) {

@@ -4,9 +4,12 @@ from sqlalchemy import text
 from datetime import datetime
 import time
 import os
+import hashlib
 import traceback
 from dotenv import load_dotenv
 import google.generativeai as genai
+from google.api_core import exceptions as google_exceptions
+from src.extensions import redis_client
 from . import tableros_bp
 
 # Cargar variables
@@ -136,16 +139,54 @@ def obtener_datos_urg():
         return jsonify({"error": f"Error servidor: {str(e)}"}), 500
 
 # --------------------------------------------
-# 🔹 Conversión a lenguaje natural (IA)
+# 🔹 Conversión a lenguaje natural (IA) con caché inteligente
 def convertir_a_lenguaje_natural_urg(texto):
     """
-    Versión IA para Urgencias — usa su propio prompt si existe
+    Versión IA para Urgencias con caché basado en contenido.
+    Si los riesgos cambian, el hash cambia y se genera nuevo análisis.
     """
     if not texto or texto.strip().lower() in ["none", "null", ""]:
         return "Sin información disponible"
 
     if not api_key:
         return "La función de resumen IA no está disponible (API Key no configurada)."
+
+# 🔹 Conversión a lenguaje natural (IA) con caché inteligente
+def convertir_a_lenguaje_natural_urg(texto):
+    """
+    Versión IA para Urgencias con caché basado en contenido.
+    Si los riesgos cambian, el hash cambia y se genera nuevo análisis.
+    """
+    if not texto or texto.strip().lower() in ["none", "null", ""]:
+        return "Sin información disponible"
+
+    if not api_key:
+        return "La función de resumen IA no está disponible (API Key no configurada)."
+
+    # Normalizar texto: quitar espacios extras, saltos de línea múltiples
+    texto_normalizado = ' '.join(texto.strip().split())
+    
+    # Generar hash MD5 del contenido normalizado
+    content_hash = hashlib.md5(texto_normalizado.encode('utf-8')).hexdigest()
+    cache_key = f"ia_resumen_urg:{content_hash}"
+    
+    print(f"🔍 Hash del contenido: {content_hash[:8]}...")
+    
+    # Intentar obtener del caché (TTL: 24 horas)
+    try:
+        cached_response = redis_client.get(cache_key)
+        if cached_response:
+            print(f"✅ Usando respuesta cacheada (hash: {content_hash[:8]})")
+            # Redis puede devolver str o bytes dependiendo de la configuración
+            if isinstance(cached_response, bytes):
+                return cached_response.decode('utf-8')
+            return cached_response
+        else:
+            print(f"❌ No hay caché disponible para este contenido")
+    except Exception as e:
+        print(f"⚠️ Error accediendo caché Redis: {e}")
+        # Si Redis falla y ya excedimos cuota, devolver mensaje sin intentar API
+        return "⚠️ El servicio de caché no está disponible. Por favor, contacte al administrador."
 
     ruta_prompt = os.path.join("config", "prompts", "tablero_urg_v1.txt")
 
@@ -167,11 +208,23 @@ def convertir_a_lenguaje_natural_urg(texto):
     prompt = prompt_base.replace("{texto}", texto.strip())
 
     try:
+        print(f"🤖 Generando nuevo análisis IA (hash: {content_hash})")
         response = model.generate_content(prompt)
-        return response.text.strip() if response and response.text else "Sin información generada"
+        resultado = response.text.strip() if response and response.text else "Sin información generada"
+        
+        # Guardar en caché por 8 horas (28800 segundos)
+        try:
+            redis_client.setex(cache_key, 28800, resultado)
+            print(f"💾 Respuesta cacheada por 8 horas")
+        except Exception as e:
+            print(f"⚠️ Error guardando en caché: {e}")
+            
+        return resultado
+    except google_exceptions.ResourceExhausted:
+        return "⚠️ Se ha excedido la cuota diaria de la API de Gemini (20 solicitudes/día en plan gratuito). Por favor, intente nuevamente mañana o actualice su plan en Google AI Studio."
     except Exception as e:
         traceback.print_exc()
-        return "Error al procesar la información (verifique el log del servidor)."
+        return f"Error al procesar la información con IA: {str(e)}"
 
 
 # --------------------------------------------

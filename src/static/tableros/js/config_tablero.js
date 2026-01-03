@@ -2,7 +2,7 @@
 const CONFIG_TABLERO = {
     // Tiempos
     DURACION_LLAMADO_SEG: 20,
-    INTERVALO_ACTUALIZACION: 5000,
+    INTERVALO_ACTUALIZACION: 2000,
     
     // Capacidades de áreas
     CAPACIDADES: {

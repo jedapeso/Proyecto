@@ -32,31 +32,31 @@
             </div>
         </header>
 
-        <section class="flex flex-col md:flex-row items-stretch justify-center gap-6 mb-6">
-            <div class="bg-white shadow rounded-lg p-3 text-center md:w-1/4 flex flex-col justify-center">
-                <h3 class="text-lg font-medium text-gray-600 flex-grow flex items-center justify-center">
+        <section class="flex flex-col lg:flex-row items-stretch justify-center gap-4 md:gap-6 mb-6">
+            <div class="bg-white shadow rounded-lg p-3 text-center lg:w-1/6 flex flex-col justify-center">
+                <h3 class="text-sm md:text-base font-medium text-gray-600 mb-2">
                     Total Pacientes
                 </h3>
-                <p id="total-pacientes" class="text-6xl font-medium text-gray-700 flex-grow flex items-center justify-center">0</p>
+                <p id="total-pacientes" class="text-4xl md:text-5xl font-bold text-gray-700">0</p>
             </div>
 
-            <div class="bg-white shadow rounded-lg p-2 overflow-x-auto md:w-2/4 flex flex-col justify-center">
+            <div class="bg-white shadow rounded-lg p-2 overflow-x-auto lg:w-4/6 flex flex-col justify-center">
                 <table class="w-full text-xs text-center border-collapse">
                     <thead class="bg-gray-100 text-gray-700 uppercase">
                     <!-- Primera fila: nombres de escalas -->
                     <tr>
-                        <th colspan="2" class="px-2 py-1 border">Escala Goldberg</th>
-                        <th colspan="2" class="px-2 py-1 border">Riesgo de Lesión por Presión</th>
-                        <th colspan="2" class="px-2 py-1 border">Riesgo de Caída</th>
+                        <th colspan="2" class="px-1 md:px-2 py-1 border text-xs">Escala Goldberg</th>
+                        <th colspan="2" class="px-1 md:px-2 py-1 border text-xs">Riesgo de Lesión por Presión</th>
+                        <th colspan="2" class="px-1 md:px-2 py-1 border text-xs">Riesgo de Caída</th>
                     </tr>
                     <!-- Segunda fila: subcolumnas -->
                     <tr>
-                        <th class="px-2 py-1 border">#Pacientes</th>
-                        <th class="px-2 py-1 border">Clasificación</th>
-                        <th class="px-2 py-1 border">#Pacientes</th>
-                        <th class="px-2 py-1 border">Clasificación</th>
-                        <th class="px-2 py-1 border">#Pacientes</th>
-                        <th class="px-2 py-1 border">Clasificación</th>
+                        <th class="px-1 md:px-2 py-1 border text-xs">#Pacientes</th>
+                        <th class="px-1 md:px-2 py-1 border text-xs">Clasificación</th>
+                        <th class="px-1 md:px-2 py-1 border text-xs">#Pacientes</th>
+                        <th class="px-1 md:px-2 py-1 border text-xs">Clasificación</th>
+                        <th class="px-1 md:px-2 py-1 border text-xs">#Pacientes</th>
+                        <th class="px-1 md:px-2 py-1 border text-xs">Clasificación</th>
                     </tr>
                     </thead>
                     <!-- tbody vacío, se llena desde JS -->
@@ -65,9 +65,9 @@
                 </div>
 
 
-            <div class="bg-white shadow rounded-lg p-4 text-center md:w-1/4 flex flex-col justify-center">
-                <h3 class="text-lg font-medium text-gray-600 flex-grow flex items-center justify-center">Promedio Estancia</h3>
-                <p id="promedio-estancia" class="text-4xl font-medium text-gray-700 flex-grow flex items-center justify-center">0</p>
+            <div class="bg-white shadow rounded-lg p-3 text-center lg:w-1/6 flex flex-col justify-center">
+                <h3 class="text-sm md:text-base font-medium text-gray-600 mb-2">Promedio Estancia</h3>
+                <p id="promedio-estancia" class="text-2xl md:text-3xl font-bold text-gray-700">0</p>
             </div>
         </section>
 

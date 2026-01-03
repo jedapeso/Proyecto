@@ -96,6 +96,12 @@
                 <i class="fas fa-check"></i> Validar
             </button>
             <p id="errorClave" class="error-mensaje"></p>
+            <div class="timer-clave">
+                <p>Tiempo disponible: <span id="tiempoRestanteClave">20</span>s</p>
+                <div class="progress-bar-clave">
+                    <div id="progressBarClave" class="progress-fill-clave"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -109,7 +115,7 @@
                 <i class="fas fa-check-circle"></i>
             </div>
             <h2>Acceso Concedido</h2>
-            <p class="info-exito">Escanee el código QR con su celular</p>
+            <p class="info-exito">Escanee el código QR o use el enlace temporal</p>
             <div class="qr-container">
                 <img id="imagenQR" src="" alt="Código QR" class="qr-image">
             </div>
@@ -117,7 +123,19 @@
                 <i class="fas fa-user"></i>
                 <span id="nombrePacienteQR"></span>
             </p>
-            <p class="instrucciones-qr">Código válido para seguimiento en tiempo real</p>
+            
+            <!-- Enlace temporal de acceso -->
+            <div class="access-link-container">
+                <p class="enlace-titulo">Enlace Temporal:</p>
+                <a id="enlaceAcceso" href="#" class="enlace-acceso-link" target="_blank" title="Abrir acceso directo">
+                    <i class="fas fa-external-link-alt"></i> Acceso Directo
+                </a>
+            </div>
+            
+            <p class="instrucciones-qr">Acceso válido por: <span id="tiempoRestanteQR">20</span>s</p>
+            <div class="progress-bar-qr">
+                <div id="progressBarQR" class="progress-fill-qr"></div>
+            </div>
             <button onclick="cerrarModalQR()" class="btn-cerrar-qr">
                 <i class="fas fa-times"></i> Cerrar
             </button>

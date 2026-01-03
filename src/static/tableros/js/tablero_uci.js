@@ -131,20 +131,33 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!data || data.error) {
       contenidoResumen.innerHTML = `<div class="p-4 text-red-600 font-semibold">⚠️ ${data?.error || "Error al generar resumen"}</div>`;
     } else {
+      const resumenHtml = markdownToHtml(data.resumen_ia || "Sin información disponible.");
       contenidoResumen.innerHTML = `
-        <div class="space-y-4">
-          <div class="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg shadow-sm">
-            <p><span class="font-semibold">Identificación:</span> ${escapeHtml(data.escide)}</p>
-            <p><span class="font-semibold">Nombre:</span> ${escapeHtml(data.nombre)}</p>
-            <p><span class="font-semibold">Habitación:</span> ${escapeHtml(data.habitacion)}</p>
-            <p><span class="font-semibold">Diagnóstico:</span> ${escapeHtml(data.diagnostico)}</p>
+        <div class="space-y-4 fade-in-content">
+          <div class="grid grid-cols-2 gap-4 bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-xl shadow-sm border border-blue-100">
+            <p class="flex items-center gap-2"><span class="font-semibold text-blue-900">🆔 Identificación:</span> <span class="text-gray-700">${escapeHtml(data.escide)}</span></p>
+            <p class="flex items-center gap-2"><span class="font-semibold text-blue-900">👤 Nombre:</span> <span class="text-gray-700">${escapeHtml(data.nombre)}</span></p>
+            <p class="flex items-center gap-2"><span class="font-semibold text-blue-900">🏥 Habitación:</span> <span class="text-gray-700">${escapeHtml(data.habitacion)}</span></p>
+            <p class="flex items-center gap-2"><span class="font-semibold text-blue-900">📋 Diagnóstico:</span> <span class="text-gray-700">${escapeHtml(data.diagnostico)}</span></p>
           </div>
-          <div class="p-4 bg-white border rounded-lg shadow">
-            <h3 class="text-lg font-semibold mb-2">📋 Riesgos y Necesidades del Paciente</h3>
-            <p class="text-gray-700 whitespace-pre-line">${escapeHtml(data.resumen_ia || "Sin información disponible.")}</p>
+          <div class="p-5 bg-white border-2 border-indigo-100 rounded-xl shadow-lg">
+            <div class="flex items-center gap-3 mb-4 pb-3 border-b border-gray-200">
+              <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center shadow-md">
+                <span class="text-white text-xl">🤖</span>
+              </div>
+              <h3 class="text-lg font-bold text-gray-800">Análisis Inteligente - Riesgos y Necesidades</h3>
+            </div>
+            <div class="ai-response-container bg-gradient-to-br from-gray-50 to-blue-50 p-4 rounded-lg">
+              <div class="text-gray-700 leading-relaxed" id="ai-text-output"></div>
+            </div>
           </div>
         </div>
       `;
+
+      const outputElement = document.getElementById("ai-text-output");
+      if (outputElement) {
+        typeWriter(outputElement, resumenHtml);
+      }
     }
     modal.classList.remove("hidden");
   }
@@ -172,6 +185,46 @@ document.addEventListener("DOMContentLoaded", () => {
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#039;");
+  }
+
+  function markdownToHtml(text) {
+    if (!text) return '';
+    return text
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/__(.+?)__/g, '<strong>$1</strong>')
+      .replace(/(?<!\*)\*(?!\*)(.+?)\*(?!\*)/g, '<em>$1</em>')
+      .replace(/(?<!_)_(?!_)(.+?)_(?!_)/g, '<em>$1</em>')
+      .replace(/^---$/gm, '<hr>')
+      .replace(/^\*\*\*$/gm, '<hr>')
+      .replace(/^[\*\-]\s+(.+)$/gm, '<li>$1</li>')
+      .replace(/^###\s+(.+)$/gm, '<h3>$1</h3>')
+      .replace(/^##\s+(.+)$/gm, '<h2>$1</h2>')
+      .replace(/^#\s+(.+)$/gm, '<h1>$1</h1>');
+  }
+
+  function typeWriter(element, htmlContent) {
+    // Si el texto trae HTML (Markdown convertido), mostrar con fade-in
+    if (htmlContent.includes('<') || htmlContent.includes('>')) {
+      element.innerHTML = htmlContent;
+      element.style.opacity = '0';
+      setTimeout(() => {
+        element.style.transition = 'opacity 0.8s ease-in';
+        element.style.opacity = '1';
+      }, 50);
+      return;
+    }
+
+    // Texto plano: efecto typing
+    let i = 0;
+    element.textContent = "";
+    function type() {
+      if (i < htmlContent.length) {
+        element.textContent += htmlContent.charAt(i);
+        i++;
+        setTimeout(type, 15);
+      }
+    }
+    type();
   }
 
   function normalizeColor(value) {
