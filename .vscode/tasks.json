@@ -1,0 +1,10 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "patch-reportes-cleanup",
+			"type": "shell",
+			"command": "echo Patching JS to auto-clear reportes on module switches"
+		}
+	]
+}

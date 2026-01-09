@@ -106,6 +106,7 @@
 
   <!-- Variables del Backend -->
   <script>
+    // @ts-nocheck
     const IDENTIFICACION = "{{ identificacion }}";
     const TOKEN = "{{ token if token else '' }}";
     const ACCESO_AUTOMATICO = {% if acceso_automatico %}true{% else %}false{% endif %};

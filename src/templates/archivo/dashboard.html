@@ -1,0 +1,634 @@
+{% extends 'base.html' %}
+
+{% block title %}Archivo | Sistema de Gestión{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='archivo/css/dashboard.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <!-- Sistema de Notificaciones -->
+  <div id="toast-container" style="position: fixed; top: 80px; right: 20px; z-index: 9999; min-width: 350px;"></div>
+
+  <!-- Header -->
+  <div class="header-archivo">
+    <h1>
+      <i class="fas fa-folder-open"></i>
+      Módulo de Archivo
+    </h1>
+    <p>Gestión centralizada de expedientes y documentos de pacientes</p>
+  </div>
+
+  <!-- Botones de Acciones -->
+  <div class="action-buttons">
+    <button class="action-btn" onclick="mostrarTraslados()">
+      <i class="fas fa-exchange-alt"></i>
+      Traslado
+    </button>
+    <button class="action-btn" onclick="recepcionArchivos()">
+      <i class="fas fa-inbox"></i>
+      Recepción
+    </button>
+    <button class="action-btn" onclick="buscarExpediente()">
+      <i class="fas fa-search"></i>
+      Búsqueda de Expediente
+    </button>
+    <button class="action-btn" onclick="reportes()">
+      <i class="fas fa-chart-bar"></i>
+      Reportes
+    </button>
+  </div>
+
+  <!-- Formulario de Traslado -->
+  <div id="seccion-traslado" class="content-section" style="display: none;">
+    <h2><i class="fas fa-exchange-alt"></i> Traslado de Historias Clínicas</h2>
+    
+    <form id="form-traslado" class="traslado-form">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="consecutivo">Consecutivo</label>
+          <input type="text" id="consecutivo" class="form-control" readonly>
+        </div>
+        
+        <div class="form-group">
+          <label for="numRegistros">Numero de Registros</label>
+          <input type="text" id="numRegistros" class="form-control" value="0" readonly>
+        </div>
+        
+        <div class="form-group">
+          <label for="fecha">Fecha</label>
+          <input type="date" id="fecha" class="form-control" readonly>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="centroOrigen">Centro de costo Origen</label>
+          <select id="centroOrigen" class="form-control form-select" required>
+            <option value="">Seleccione...</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="centroDestino">Centro de Costo Destino</label>
+          <select id="centroDestino" class="form-control form-select" required>
+            <option value="">Seleccione...</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="btn btn-add" onclick="abrirModalHistoria()" disabled>
+          <i class="fas fa-plus"></i> AGREGAR HISTORIA
+        </button>
+        <button type="button" class="btn btn-save" onclick="guardarTraslado()" disabled>
+          <i class="fas fa-save"></i> GUARDAR
+        </button>
+      </div>
+    </form>
+
+    <!-- Modal búsqueda/agregado de historia -->
+    <div class="modal fade" id="modalHistoria" tabindex="-1" aria-labelledby="modalHistoriaLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="modalHistoriaLabel">Agregar historia al traslado</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="row g-3 mb-3 align-items-end">
+              <div class="col-md-4">
+                <label class="form-label" for="modal_historia">Historia</label>
+                <input type="text" id="modal_historia" class="form-control" placeholder="Historia">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="modal_ingreso">Ingreso</label>
+                <input type="text" id="modal_ingreso" class="form-control" placeholder="1">
+              </div>
+              <div class="col-md-4">
+                <button type="button" class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2" id="btnBuscarModal" onclick="buscarHistoriaModal()" style="height: 38px;">
+                  <i class="fas fa-search"></i>
+                  <span>Buscar</span>
+                </button>
+              </div>
+            </div>
+            <div class="row g-3">
+              <div class="col-md-3">
+                <label class="form-label" for="modal_tipoId">Tipo ID</label>
+                <input type="text" id="modal_tipoId" class="form-control" readonly>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label" for="modal_identificacion">Identificación</label>
+                <input type="text" id="modal_identificacion" class="form-control" readonly>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="modal_nombre">Nombre</label>
+                <input type="text" id="modal_nombre" class="form-control" readonly>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="modal_fechaIngreso">Fecha Ingreso</label>
+                <input type="date" id="modal_fechaIngreso" class="form-control" readonly>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="modal_fechaEgreso">Fecha Egreso</label>
+                <input type="date" id="modal_fechaEgreso" class="form-control" readonly>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="button" class="btn btn-success" id="btnAceptarModal" onclick="agregarHistoriaDesdeModal()" disabled>
+              <i class="fas fa-check"></i> Aceptar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="detalle-section">
+      <h3>Detalle de Traslado de Histarias Clínicas</h3>
+      <div class="table-responsive">
+        <table id="tabla-historias" class="table-historias">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Historia</th>
+              <th>Tipo ID</th>
+              <th>Identificación</th>
+              <th>Nombre</th>
+              <th>Ingreso</th>
+              <th>Fecha Ingreso</th>
+              <th>Fecha Egreso</th>
+              <th>Centro Origen</th>
+              <th>Centro Destino</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-historias">
+            <tr>
+              <td colspan="11" style="text-align: center; padding: 2.5rem; color: #6c757d;">
+                <i class="fas fa-info-circle" style="font-size: 2.5rem; opacity: 0.4; display: block; margin-bottom: 1rem;"></i>
+                <strong style="display: block; margin-bottom: 0.5rem; font-size: 1rem;">Debe seleccionar los centros de costo para comenzar</strong>
+                <span style="font-size: 0.9rem;">Escoja un <strong>Centro de Costo Origen</strong> y un <strong>Centro de Costo Destino</strong> para habilitar el botón "AGREGAR HISTORIA"</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recepción de Archivos -->
+  <div id="seccion-recepcion" class="content-section" style="display: none;">
+    <h2><i class="fas fa-inbox"></i> Recepción de Historias Clínicas</h2>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="rec_consecutivo">Consecutivo</label>
+        <input type="text" id="rec_consecutivo" class="form-control" readonly>
+      </div>
+      <div class="form-group">
+        <label for="rec_numRegistros">Numero de Registros</label>
+        <input type="text" id="rec_numRegistros" class="form-control" value="0" readonly>
+      </div>
+      <div class="form-group">
+        <label for="rec_fecha">Fecha</label>
+        <input type="date" id="rec_fecha" class="form-control" readonly>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="rec_centroOrigen">Centro de costo Origen</label>
+        <input type="text" id="rec_centroOrigen" class="form-control" readonly>
+      </div>
+      <div class="form-group">
+        <label for="rec_centroDestino">Centro de Costo Destino</label>
+        <input type="text" id="rec_centroDestino" class="form-control" readonly>
+      </div>
+    </div>
+
+    <div class="form-actions" style="display: grid; grid-template-columns: auto auto 1fr; gap: 15px; align-items: start;">
+      <button type="button" class="btn btn-save">
+        <i class="fas fa-save"></i> GUARDAR RECEPCIÓN
+      </button>
+      <button type="button" class="btn" id="btnRechazarTodo" onclick="toggleRechazarTodo()" style="background: #6c757d; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 0.5rem; cursor: pointer; font-weight: 600; transition: all 0.3s; display: flex; align-items: center; gap: 0.5rem; white-space: nowrap;">
+        <i class="fas fa-times-circle"></i> RECHAZAR TODO
+      </button>
+      <div id="contenedorObservacionGeneral" style="display: none;">
+        <label for="observacionGeneral" style="display: block; font-weight: 600; margin-bottom: 10px; color: #dc3545; font-size: 0.95rem;">
+          <i class="fas fa-exclamation-triangle"></i> Observación general del rechazo (mínimo 10 caracteres)
+        </label>
+        <textarea 
+          id="observacionGeneral" 
+          class="form-control" 
+          rows="3" 
+          placeholder="Ingrese la razón del rechazo general del traslado (mínimo 10 caracteres)..."
+          style="resize: vertical; border: 2px solid #dc3545; border-radius: 0.5rem; width: 100%; font-size: 0.9rem; padding: 0.75rem; box-shadow: 0 2px 4px rgba(220, 53, 69, 0.1);"
+        ></textarea>
+        <small style="display: block; margin-top: 6px; color: #6c757d; font-style: italic;">
+          <i class="fas fa-info-circle"></i> Esta observación se aplicará a todos los registros rechazados
+        </small>
+      </div>
+    </div>
+
+    <div class="detalle-section">
+      <h3>Detalle para recepción</h3>
+      <div class="table-responsive">
+        <table id="tabla-recepcion" class="table-historias">
+          <thead>
+            <tr>
+              <th><i class="fas fa-hashtag"></i></th>
+              <th><i class="fas fa-notes-medical"></i> Historia</th>
+              <th><i class="fas fa-id-card"></i> Tipo ID</th>
+              <th><i class="fas fa-fingerprint"></i> Identificación</th>
+              <th><i class="fas fa-user"></i> Nombre</th>
+              <th><i class="fas fa-door-open"></i> Ingreso</th>
+              <th><i class="far fa-calendar-alt"></i> Fecha Ingreso</th>
+              <th><i class="far fa-calendar-check"></i> Fecha Egreso</th>
+              <th><i class="fas fa-calendar-day"></i> Fecha Traslado</th>
+              <th><i class="fas fa-info-circle"></i> Estado</th>
+              <th><i class="fas fa-toggle-on"></i> Acciones</th>
+              <th><i class="fas fa-comment-dots"></i> Observación</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-recepcion">
+            <!-- Filas cargadas por JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Búsqueda de Expedientes -->
+  <div id="seccion-busqueda" class="content-section" style="display: none;">
+    <h2><i class="fas fa-search"></i> Búsqueda de Expedientes</h2>
+
+    <div class="row g-3 mb-4">
+      <div class="col-md-4">
+        <label class="form-label" for="busq_historia">Historia</label>
+        <input type="text" id="busq_historia" class="form-control" placeholder="Número de historia">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="busq_ingreso">Ingreso</label>
+        <input type="text" id="busq_ingreso" class="form-control" placeholder="Número de ingreso">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label" for="busq_cedula">Cédula</label>
+        <input type="text" id="busq_cedula" class="form-control" placeholder="Número de cédula">
+      </div>
+    </div>
+
+    <div class="mb-4">
+      <button type="button" class="btn btn-primary" onclick="realizarBusquedaExpediente()">
+        <i class="fas fa-search"></i> BUSCAR
+      </button>
+      <button type="button" class="btn btn-secondary" onclick="limpiarBusqueda()">
+        <i class="fas fa-eraser"></i> LIMPIAR
+      </button>
+    </div>
+
+    <div class="detalle-section">
+      <h3>Resultados de la búsqueda</h3>
+      <div class="table-responsive">
+        <table class="table-historias">
+          <thead>
+            <tr>
+              <th><i class="fas fa-hashtag"></i></th>
+              <th><i class="fas fa-file-alt"></i> Consecutivo</th>
+              <th><i class="fas fa-notes-medical"></i> Historia</th>
+              <th><i class="fas fa-door-open"></i> Ingreso</th>
+              <th><i class="fas fa-id-card"></i> Tipo ID</th>
+              <th><i class="fas fa-fingerprint"></i> Identificación</th>
+              <th><i class="fas fa-user"></i> Nombre</th>
+              <th><i class="far fa-calendar-alt"></i> Fecha Ingreso</th>
+              <th><i class="far fa-calendar-check"></i> Fecha Egreso</th>
+              <th><i class="fas fa-calendar-day"></i> Fecha Traslado</th>
+              <th><i class="fas fa-map-marker-alt"></i> Origen</th>
+              <th><i class="fas fa-map-marked-alt"></i> Destino</th>
+              <th><i class="fas fa-info-circle"></i> Estado</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-busqueda">
+            <tr>
+              <td colspan="13" style="text-align: center; padding: 3rem; color: #6c757d;">
+                <i class="fas fa-search" style="font-size: 3rem; opacity: 0.3; display: block; margin-bottom: 1rem;"></i>
+                Ingrese criterios de búsqueda y presione BUSCAR
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reportes de Traslados -->
+  <div id="seccion-reportes" class="content-section" style="display: none;">
+    <h2><i class="fas fa-chart-bar"></i> Reportes de Traslados Recepcionados</h2>
+
+    <div class="row g-3 mb-4">
+      <div class="col-md-3">
+        <label class="form-label" for="rep_fechaInicio">Fecha inicial</label>
+        <input type="date" id="rep_fechaInicio" class="form-control">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" for="rep_fechaFin">Fecha final</label>
+        <input type="date" id="rep_fechaFin" class="form-control">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" for="rep_estado">Estado</label>
+        <select id="rep_estado" class="form-control form-select">
+          <option value="">Todos</option>
+          <option value="A">Aceptados</option>
+          <option value="R">Rechazados</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" for="rep_consecutivo">Consecutivo</label>
+        <input type="text" id="rep_consecutivo" class="form-control" placeholder="HC00000">
+      </div>
+    </div>
+
+    <div class="mb-4">
+      <button type="button" class="btn btn-primary" id="btnBuscarReportes">
+        <i class="fas fa-search"></i> BUSCAR
+      </button>
+      <button type="button" class="btn btn-secondary" onclick="limpiarReportes()">
+        <i class="fas fa-eraser"></i> LIMPIAR
+      </button>
+    </div>
+
+    <div class="detalle-section">
+      <h3>Resultados del Reporte</h3>
+      <div class="table-responsive">
+        <table class="table-historias">
+          <thead>
+            <tr>
+              <th><i class="fas fa-hashtag"></i></th>
+              <th><i class="fas fa-file-alt"></i> Consecutivo</th>
+              <th><i class="fas fa-calendar-day"></i> Fecha</th>
+              <th><i class="fas fa-map-marker-alt"></i> Origen</th>
+              <th><i class="fas fa-map-marked-alt"></i> Destino</th>
+              <th><i class="fas fa-notes-medical"></i> Historias</th>
+              <th><i class="fas fa-info-circle"></i> Estado</th>
+              <th><i class="fas fa-cogs"></i> Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-reportes">
+            <tr>
+              <td colspan="8" style="text-align: center; padding: 3rem; color: #6c757d;">
+                <i class="fas fa-chart-bar" style="font-size: 3rem; opacity: 0.3; display: block; margin-bottom: 1rem;"></i>
+                Ingrese criterios de búsqueda y presione BUSCAR
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Ver Detalle Traslado -->
+  <div class="modal fade" id="modalDetalleTraslado" tabindex="-1" aria-labelledby="modalDetalleTrasladoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalDetalleTrasladoLabel">Detalle del Traslado</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row mb-3">
+            <div class="col-md-4">
+              <strong>Consecutivo:</strong> <span id="det_consecutivo"></span>
+            </div>
+            <div class="col-md-4">
+              <strong>Fecha:</strong> <span id="det_fecha"></span>
+            </div>
+            <div class="col-md-4">
+              <strong>Estado:</strong> <span id="det_estado"></span>
+            </div>
+          </div>
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <strong>Centro Origen:</strong> <span id="det_origen"></span>
+            </div>
+            <div class="col-md-6">
+              <strong>Centro Destino:</strong> <span id="det_destino"></span>
+            </div>
+          </div>
+          <hr>
+          <h6>Expedientes del Traslado</h6>
+          <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+            <table class="table-historias">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Historia</th>
+                  <th>Ingreso</th>
+                  <th>Tipo ID</th>
+                  <th>Identificación</th>
+                  <th>Nombre</th>
+                  <th>Fecha Ingreso</th>
+                  <th>Fecha Egreso</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-detalle-modal">
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Contenido Principal (Inicial) -->
+  <div id="seccion-inicial" class="content-section">
+    <h2><i class="fas fa-inbox"></i> Panel de Control</h2>
+    <div class="placeholder-content">
+      <i class="fas fa-file-medical"></i>
+      <p>Selecciona una opción del menú superior para comenzar</p>
+      <p class="small">Gestiona traslados, busca expedientes o consulta el historial</p>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Descargar Excel después de recepción -->
+<div class="modal fade" id="modalExportRecepcion" tabindex="-1" aria-labelledby="modalExportRecepcionLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="background: linear-gradient(135deg, #28a745 0%, #218838 100%); color: white;">
+        <h5 class="modal-title" id="modalExportRecepcionLabel">
+          <i class="fas fa-file-excel"></i> Exportar reporte
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" style="padding: 1.5rem;">
+        <p style="margin: 0; font-size: 1rem;">
+          La recepción fue guardada correctamente. ¿Desea descargar el reporte en Excel ahora?
+        </p>
+      </div>
+      <div class="modal-footer" style="justify-content: center; gap: 12px;">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="min-width: 120px;">
+          <i class="fas fa-times"></i> No, luego
+        </button>
+        <button type="button" class="btn btn-success" id="btnDescargarExcelRecepcion" style="min-width: 140px;">
+          <i class="fas fa-download"></i> Descargar Excel
+        </button>
+      </div>
+    </div>
+  </div>
+  </div>
+
+<!-- Modal Recepción: búsqueda por fechas y selección de traslado -->
+<div class="modal fade" id="modalRecepcion" tabindex="-1" aria-labelledby="modalRecepcionLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalRecepcionLabel">Recepción de archivos</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3 mb-3 align-items-end">
+          <div class="col-md-4">
+            <label class="form-label" for="rec_fechaInicio">Fecha inicial</label>
+            <input type="date" id="rec_fechaInicio" class="form-control">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="rec_fechaFin">Fecha final</label>
+            <input type="date" id="rec_fechaFin" class="form-control">
+          </div>
+          <div class="col-md-4">
+            <button type="button" class="btn btn-primary w-100 d-flex align-items-center justify-content-center gap-2" id="btnBuscarRecepcion" style="height: 38px;">
+              <i class="fas fa-search"></i>
+              <span>Buscar</span>
+            </button>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table-historias">
+            <thead>
+              <tr>
+                <th>Consecutivo</th>
+                <th>Fecha</th>
+                <th>Origen</th>
+                <th>Destino</th>
+                <th>Historias</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-traslados-recepcion">
+              <!-- Encabezados cargados por fechas -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de Confirmación de Guardado de Traslado -->
+<div class="modal fade" id="modalConfirmacionTraslado" tabindex="-1" aria-labelledby="modalConfirmacionTrasladoLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); color: white;">
+        <h5 class="modal-title" id="modalConfirmacionTrasladoLabel">
+          <i class="fas fa-save"></i> Confirmar Guardado
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" style="padding: 2rem;">
+        <div style="text-align: center; margin-bottom: 1.5rem;">
+          <i class="fas fa-question-circle" style="font-size: 4rem; color: #17a2b8;"></i>
+        </div>
+        <p style="font-size: 1.1rem; text-align: center; margin-bottom: 0;" id="mensajeConfirmacionTraslado">
+          ¿Desea guardar el traslado de <strong id="cantidadHistorias"></strong> historia(s)?
+        </p>
+      </div>
+      <div class="modal-footer" style="justify-content: center; gap: 15px;">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="min-width: 120px;">
+          <i class="fas fa-times"></i> Cancelar
+        </button>
+        <button type="button" class="btn btn-primary" id="btnConfirmarGuardado" style="min-width: 120px; background: #17a2b8; border-color: #17a2b8;">
+          <i class="fas fa-check"></i> Continuar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de Confirmación de Rechazo -->
+<div class="modal fade" id="modalConfirmacionRechazo" tabindex="-1" aria-labelledby="modalConfirmacionRechazoLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: white;">
+        <h5 class="modal-title" id="modalConfirmacionRechazoLabel">
+          <i class="fas fa-exclamation-triangle"></i> Confirmar Rechazo
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" style="padding: 2rem;">
+        <div style="text-align: center; margin-bottom: 1.5rem;">
+          <i class="fas fa-question-circle" style="font-size: 4rem; color: #dc3545;"></i>
+        </div>
+        <p style="font-size: 1.1rem; text-align: center; margin-bottom: 0;" id="mensajeConfirmacionRechazo">
+          ¿Está seguro que desea rechazar el traslado <strong id="consecutivoConfirmacion"></strong>?
+        </p>
+      </div>
+      <div class="modal-footer" style="justify-content: center; gap: 15px;">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="min-width: 120px;">
+          <i class="fas fa-times"></i> Cancelar
+        </button>
+        <button type="button" class="btn btn-danger" id="btnConfirmarRechazo" style="min-width: 120px;">
+          <i class="fas fa-check"></i> Continuar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de Confirmación de Guardado de Recepción -->
+<div class="modal fade" id="modalConfirmacionGuardado" tabindex="-1" aria-labelledby="modalConfirmacionGuardadoLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); color: white;">
+        <h5 class="modal-title" id="modalConfirmacionGuardadoLabel">
+          <i class="fas fa-check-double"></i> Confirmar Guardado de Recepción
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" style="padding: 2rem;">
+        <div style="text-align: center; margin-bottom: 1.5rem;">
+          <i class="fas fa-question-circle" style="font-size: 4rem; color: #17a2b8;"></i>
+        </div>
+        <p style="font-size: 1.05rem; text-align: center; margin-bottom: 1rem;">
+          ¿Está seguro que desea guardar la recepción del traslado?
+        </p>
+        <p style="font-size: 0.95rem; text-align: center; color: #6c757d; margin-bottom: 0;">
+          <strong>Consecutivo:</strong> <span id="consecutivoConfirmacionGuardado" style="color: #17a2b8; font-weight: 700;">HC00000</span>
+        </p>
+      </div>
+      <div class="modal-footer" style="justify-content: center; gap: 15px;">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="min-width: 120px;">
+          <i class="fas fa-times"></i> Cancelar
+        </button>
+        <button type="button" class="btn btn-primary" id="btnConfirmarGuardadoRecepcion" style="min-width: 120px; background: #17a2b8; border-color: #17a2b8;">
+          <i class="fas fa-save"></i> Guardar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<script src="{{ url_for('static', filename='archivo/js/dashboard.js') }}"></script>
+{% endblock %}
