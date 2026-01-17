@@ -36,6 +36,9 @@ document.addEventListener('DOMContentLoaded', function () {
     let pollingInterval = null;
     const resumen = {};
     let cuerpoTabla = null;
+    let mensajesGlobalesMostrados = new Set(); // Track which global messages were already shown
+    let submitBtn = null; // Botón de envío accesible desde cancelación
+    let usuarioIdActual = null; // Último proceso lanzado
 
     if (!form) return;
 
@@ -60,7 +63,8 @@ document.addEventListener('DOMContentLoaded', function () {
     function actualizarTabla() {
         if (!cuerpoTabla) return;
         cuerpoTabla.innerHTML = "";
-        Object.keys(resumen).sort().forEach(año => {
+        // Ordenar años de mayor a menor (2026 → 2006)
+        Object.keys(resumen).sort((a, b) => Number(b) - Number(a)).forEach(año => {
             const { icono, color, estado, tiempo } = resumen[año];
             const row = document.createElement("tr");
             row.innerHTML = `
@@ -113,15 +117,39 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         actualizarTabla();
         if (globalBox && globalMessages) {
+            const msgCancel = "🛑 Proceso cancelado por el usuario.";
             globalBox.style.display = "block";
-            globalMessages.innerHTML += "🛑 Proceso cancelado por el usuario.<br>";
+            if (!mensajesGlobalesMostrados.has(msgCancel)) {
+                globalMessages.innerHTML += msgCancel + "<br>";
+                mensajesGlobalesMostrados.add(msgCancel);
+            }
         }
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = "Enviar Reporte";
+        }
+    }
+
+    function limpiarUITrasCancelacion() {
+        detenerPolling();
+        Object.keys(resumen).forEach(k => delete resumen[k]);
+        if (globalBox && globalMessages) {
+            globalMessages.innerHTML = "";
+            globalBox.style.display = "none";
+        }
+        progressContainer.innerHTML = "";
+        cuerpoTabla = null;
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = "Enviar Reporte";
+        }
+        mostrarAlerta('<i class="fas fa-ban me-2"></i> Proceso cancelado correctamente.', 'danger');
     }
 
     // ======== Envío del formulario ========
     form.addEventListener("submit", async (e) => {
         e.preventDefault();
-        const submitBtn = form.querySelector('button[type="submit"]');
+        submitBtn = form.querySelector('button[type="submit"]');
         if (!submitBtn) return;
 
         submitBtn.disabled = true;
@@ -129,6 +157,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         crearEstructuraTablaResumen();
         Object.keys(resumen).forEach(k => delete resumen[k]);
+        mensajesGlobalesMostrados.clear(); // Reset global messages tracker
 
         try {
             const response = await fetch(form.action, { method: "POST", headers: { "X-Requested-With": "XMLHttpRequest" } });
@@ -143,11 +172,12 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             const usuario_id = data.usuario_id;
+            usuarioIdActual = usuario_id;
             const añosIniciales = data.anios || [];
 
-            // Inicializar la tabla con los años inmediatamente
+            // Inicializar la tabla: mostrar "En cola" hasta que cada año realmente inicie (log "Iniciando...")
             añosIniciales.forEach(año => {
-                resumen[año] = { icono: "fa-spinner fa-spin", color: "text-primary", estado: "Procesando...", tiempo: "-" };
+                resumen[año] = { icono: "fa-clock", color: "text-muted", estado: "En cola", tiempo: "-" };
             });
             actualizarTabla();
 
@@ -182,7 +212,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                 resumen[año] = { icono: "fa-ban", color: "text-danger", estado: "Cancelado", tiempo: "-" };
                             }
 
-                            // Mensajes globales
+                            // Mensajes globales (solo agregar si no se ha mostrado antes)
                             if (
                                 linea.includes("📊 Combinando resultados") ||
                                 linea.includes("📧 Enviando correo") ||
@@ -191,9 +221,10 @@ document.addEventListener('DOMContentLoaded', function () {
                                 linea.includes("✅ Proceso finalizado correctamente") ||
                                 linea.includes("🛑 Cancelación detectada")
                             ) {
-                                if (globalBox && globalMessages) {
+                                if (globalBox && globalMessages && !mensajesGlobalesMostrados.has(linea)) {
                                     globalBox.style.display = "block";
                                     globalMessages.innerHTML += linea + "<br>";
+                                    mensajesGlobalesMostrados.add(linea);
                                 }
                             }
                         });
@@ -201,10 +232,17 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
 
                     if (logData.finalizado) {
+                        const fueCancelado = logData.progreso && (logData.progreso["estado_global"] === "cancelado");
                         detenerPolling();
-                        mostrarResumenFinal();
-                        submitBtn.disabled = false;
-                        submitBtn.innerHTML = "Enviar Reporte";
+                        if (fueCancelado) {
+                            limpiarUITrasCancelacion();
+                        } else {
+                            mostrarResumenFinal();
+                            if (submitBtn) {
+                                submitBtn.disabled = false;
+                                submitBtn.innerHTML = "Enviar Reporte";
+                            }
+                        }
                     }
 
                 } catch (err) {
@@ -229,16 +267,23 @@ document.addEventListener('DOMContentLoaded', function () {
             btnCancelar.disabled = true;
             btnCancelar.innerHTML = '<i class="fa fa-spinner fa-spin me-1"></i> Cancelando...';
             try {
-                const resp = await fetch("/facturacion/cancelar-reporte-cargos", { method: "POST" });
+                if (globalBox && globalMessages) {
+                    globalBox.style.display = "block";
+                    globalMessages.innerHTML += "⏳ Cancelando el proceso...<br>";
+                }
+                const resp = await fetch("/facturacion/cancelar-reporte-cargos", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+                    body: JSON.stringify({ usuario_id: usuarioIdActual })
+                });
                 const data = await resp.json();
                 if (data.status === "cancelado") {
-                    mostrarAlerta("🛑 " + data.mensaje, "danger");
-                    marcarCancelados();
+                    // No limpiar aún; esperar a que el backend marque finalizado y el polling lo detecte
                 } else {
                     mostrarAlerta("⚠️ " + (data.mensaje || "No se pudo cancelar el proceso."), "warning");
                 }
             } catch (err) {
-                mostrarAlerta("❌ Error al cancelar el proceso.", "danger");
+                mostrarAlerta("❌ Error al cancelar el proceso: " + err.message, "danger");
                 console.error(err);
             }
             btnCancelar.innerHTML = '<i class="fa fa-ban me-1"></i> Cancelar proceso';

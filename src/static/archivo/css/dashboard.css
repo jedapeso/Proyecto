@@ -342,38 +342,6 @@ select.form-select:disabled {
 #seccion-reportes .table-historias tbody td:nth-child(7) { width: 15%; text-align: center; }
 #seccion-reportes .table-historias tbody td:nth-child(8) { width: 14%; text-align: center; }
 
-/* Anchos y estilos optimizados para tabla de búsqueda */
-#seccion-busqueda .table-historias th:nth-child(1) { width: 3%; } /* # */
-#seccion-busqueda .table-historias th:nth-child(2) { width: 8%; } /* Consecutivo */
-#seccion-busqueda .table-historias th:nth-child(3) { width: 7%; } /* Historia */
-#seccion-busqueda .table-historias th:nth-child(4) { width: 5%; } /* Ingreso */
-#seccion-busqueda .table-historias th:nth-child(5) { width: 5%; } /* Tipo ID */
-#seccion-busqueda .table-historias th:nth-child(6) { width: 8%; } /* Identificación */
-#seccion-busqueda .table-historias th:nth-child(7) { width: 12%; } /* Nombre */
-#seccion-busqueda .table-historias th:nth-child(8) { width: 8%; } /* Fecha Ingreso */
-#seccion-busqueda .table-historias th:nth-child(9) { width: 8%; } /* Fecha Egreso */
-#seccion-busqueda .table-historias th:nth-child(10) { width: 8%; } /* Fecha Traslado */
-#seccion-busqueda .table-historias th:nth-child(11) { width: 10%; } /* Origen */
-#seccion-busqueda .table-historias th:nth-child(12) { width: 10%; } /* Destino */
-#seccion-busqueda .table-historias th:nth-child(13) { width: 8%; } /* Estado */
-
-/* Estilos para celdas de datos en tabla de búsqueda */
-#seccion-busqueda .table-historias tbody td { text-align: center; vertical-align: middle; }
-#seccion-busqueda .table-historias tbody td:nth-child(1) { width: 3%; font-weight: 600; }
-#seccion-busqueda .table-historias tbody td:nth-child(2) { width: 8%; text-align: center; }
-#seccion-busqueda .table-historias tbody td:nth-child(3) { width: 7%; text-align: center; }
-#seccion-busqueda .table-historias tbody td:nth-child(4) { width: 5%; text-align: center; }
-#seccion-busqueda .table-historias tbody td:nth-child(5) { width: 5%; text-align: center; }
-#seccion-busqueda .table-historias tbody td:nth-child(6) { width: 8%; text-align: center; }
-#seccion-busqueda .table-historias tbody td:nth-child(7) { width: 12%; text-align: left; }
-#seccion-busqueda .table-historias tbody td:nth-child(8) { width: 8%; text-align: center; }
-#seccion-busqueda .table-historias tbody td:nth-child(9) { width: 8%; text-align: center; }
-#seccion-busqueda .table-historias tbody td:nth-child(10) { width: 8%; text-align: center; }
-#seccion-busqueda .table-historias tbody td:nth-child(11) { width: 10%; text-align: center; font-size: 0.85rem; }
-#seccion-busqueda .table-historias tbody td:nth-child(12) { width: 10%; text-align: center; font-size: 0.85rem; }
-#seccion-busqueda .table-historias tbody td:nth-child(13) { width: 8%; text-align: center; }
-#seccion-reportes .table-historias tbody td:nth-child(7) { width: 20%; text-align: center; }
-
 /* Anchos optimizados para cada columna - tabla detalle */
 .detalle-section .table-historias th:nth-child(1),
 .detalle-section .table-historias td:nth-child(1) { width: 3%; text-align: center; } /* # */
@@ -754,8 +722,8 @@ input:disabled + .slider:before {
 }
 
 .estado-pendiente {
-  background-color: #6c757d;
-  color: white;
+  background-color: #ffc107;
+  color: #000;
 }
 
 .estado-aceptada {
@@ -766,4 +734,23 @@ input:disabled + .slider:before {
 .estado-rechazada {
   background-color: #dc3545;
   color: white;
+}
+
+.estado-historico {
+  background-color: #6c757d;
+  color: white;
+}
+
+/* Estilo sutil para registros del sistema anterior */
+.fila-sistema-anterior {
+  background-color: #f8f9fa !important;
+  border-left: 3px solid #adb5bd;
+}
+
+.fila-sistema-anterior:hover {
+  background-color: #e9ecef !important;
+}
+
+.fila-sistema-anterior td {
+  opacity: 0.9;
 }

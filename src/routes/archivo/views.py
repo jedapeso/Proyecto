@@ -575,7 +575,7 @@ def obtener_detalle_traslado(consecutivo):
 
 @archivo_bp.route('/busqueda/expediente', methods=['POST'])
 def buscar_expediente():
-    """Busca expedientes en TRADET por historia+ingreso o cédula"""
+    """Busca expedientes usando procedimientos almacenados (incluye sistema anterior)"""
     try:
         data = request.get_json()
         historia = data.get('historia', '').strip()
@@ -586,52 +586,30 @@ def buscar_expediente():
             return jsonify({'success': False, 'error': 'Debe proporcionar Historia o Cédula'}), 400
 
         with engine.connect() as conn:
-            # Construir consulta dinámica
+            # Determinar qué SP ejecutar según los parámetros
             if historia and ingreso:
-                # Búsqueda por historia e ingreso específico
-                query = text("""
-                    SELECT 
-                        d.TRADETCOD, d.TRADETHIS, d.TRADETNUM, d.TRADETTIP, 
-                        d.TRADETIDE, d.TRADETNOM, d.TRADETFIN, d.TRADETFEG, 
-                        d.TRADETFTR, d.TRADESEST,
-                        e.TRAENCORI, e.TRAENCDES
-                    FROM TRADET d
-                    INNER JOIN TRAENC e ON e.TRAENCCOD = d.TRADETCOD
-                    WHERE d.TRADETHIS = :historia AND d.TRADETNUM = :ingreso
-                    ORDER BY d.TRADETFTR DESC, d.TRADETCOD DESC
-                """)
-                result = conn.execute(query, {'historia': int(historia), 'ingreso': int(ingreso)})
+                # SP 1: Búsqueda por historia + ingreso específico
+                conn.execute(
+                    text("EXECUTE PROCEDURE SP_TR_BuscaExpHiIng(:historia, :ingreso)"),
+                    {'historia': int(historia), 'ingreso': int(ingreso)}
+                )
             elif historia:
-                # Búsqueda solo por historia (todos los ingresos)
-                query = text("""
-                    SELECT 
-                        d.TRADETCOD, d.TRADETHIS, d.TRADETNUM, d.TRADETTIP, 
-                        d.TRADETIDE, d.TRADETNOM, d.TRADETFIN, d.TRADETFEG, 
-                        d.TRADETFTR, d.TRADESEST,
-                        e.TRAENCORI, e.TRAENCDES
-                    FROM TRADET d
-                    INNER JOIN TRAENC e ON e.TRAENCCOD = d.TRADETCOD
-                    WHERE d.TRADETHIS = :historia
-                    ORDER BY d.TRADETFTR DESC, d.TRADETCOD DESC
-                """)
-                result = conn.execute(query, {'historia': int(historia)})
+                # SP 2: Búsqueda solo por historia (todos los ingresos)
+                conn.execute(
+                    text("EXECUTE PROCEDURE SP_TR_BuscaExpHi(:historia)"),
+                    {'historia': int(historia)}
+                )
             elif cedula:
-                # Búsqueda por cédula (puede retornar múltiples registros)
-                query = text("""
-                    SELECT 
-                        d.TRADETCOD, d.TRADETHIS, d.TRADETNUM, d.TRADETTIP, 
-                        d.TRADETIDE, d.TRADETNOM, d.TRADETFIN, d.TRADETFEG, 
-                        d.TRADETFTR, d.TRADESEST,
-                        e.TRAENCORI, e.TRAENCDES
-                    FROM TRADET d
-                    INNER JOIN TRAENC e ON e.TRAENCCOD = d.TRADETCOD
-                    WHERE d.TRADETIDE = :cedula
-                    ORDER BY d.TRADETFTR DESC, d.TRADETCOD DESC
-                """)
-                result = conn.execute(query, {'cedula': cedula})
+                # SP 3: Búsqueda por cédula
+                conn.execute(
+                    text("EXECUTE PROCEDURE SP_TR_BuscaExpCed(:cedula)"),
+                    {'cedula': cedula}
+                )
             else:
                 return jsonify({'success': False, 'error': 'Criterios de búsqueda incompletos'}), 400
 
+            # Consultar resultados de la tabla temporal BUSEXP1
+            result = conn.execute(text("SELECT * FROM BUSEXP1"))
             rows = result.fetchall()
 
             if not rows:
@@ -639,19 +617,37 @@ def buscar_expediente():
 
             resultados = []
             for row in rows:
+                # Detectar si es del sistema anterior (fecha_egreso = '1900-01-01')
+                fecha_egreso_str = str(row[7]) if row[7] else ''
+                es_sistema_anterior = fecha_egreso_str.startswith('1900-01-01')
+                
+                # Función auxiliar para asegurar encoding UTF-8
+                def safe_str(value):
+                    if value is None:
+                        return ''
+                    s = str(value)
+                    # Si ya es unicode, retorna como está
+                    if isinstance(s, str):
+                        return s
+                    # Si es bytes, decodifica a UTF-8
+                    if isinstance(s, bytes):
+                        return s.decode('utf-8', errors='replace')
+                    return s
+                
                 resultados.append({
-                    'consecutivo': row[0],
-                    'historia': row[1],
-                    'ingreso': row[2],
-                    'tipoId': row[3],
-                    'identificacion': row[4],
-                    'nombre': row[5],
+                    'consecutivo': safe_str(row[0]),
+                    'historia': safe_str(row[1]),
+                    'ingreso': safe_str(row[2]),
+                    'tipoId': safe_str(row[3]),
+                    'identificacion': safe_str(row[4]),
+                    'nombre': safe_str(row[5]),  # Decodificar correctamente
                     'fecha_ingreso': str(row[6]) if row[6] else '',
-                    'fecha_egreso': str(row[7]) if row[7] else '',
+                    'fecha_egreso': fecha_egreso_str if not es_sistema_anterior else '',  # Ocultar fecha dummy
                     'fecha_traslado': str(row[8]) if row[8] else '',
-                    'estado': row[9] if row[9] else 'N',
-                    'origen': row[10],
-                    'destino': row[11]
+                    'estado': safe_str(row[9]),
+                    'origen': safe_str(row[10]),
+                    'destino': safe_str(row[11]),
+                    'sistema_anterior': es_sistema_anterior  # Indicador para el frontend
                 })
 
             return jsonify({'success': True, 'resultados': resultados})

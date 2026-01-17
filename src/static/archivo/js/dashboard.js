@@ -8,6 +8,14 @@ let modalRecepcion = null;
 let trasladosRecepcion = [];
 let detalleRecepcion = [];
 
+// Función para decodificar HTML entities (Ñ, á, é, etc)
+function decodificarHTML(texto) {
+  if (!texto) return '';
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = texto;
+  return textarea.value;
+}
+
 // Sistema de notificaciones
 function mostrarNotificacion(mensaje, tipo = 'info') {
   const container = document.getElementById('toast-container');
@@ -264,20 +272,39 @@ function renderizarResultadosBusqueda(resultados) {
   tbody.innerHTML = '';
 
   resultados.forEach((item, idx) => {
-    const estado = item.estado || 'N';
-    const estadoTexto = estado === 'R' ? 'Rechazada' : 'Aceptada';
-    const claseBadge = estado === 'R' ? 'rechazada' : 'aceptada';
-    const iconoEstado = estado === 'R' ? '<i class="fas fa-times-circle"></i>' : '<i class="fas fa-check-circle"></i>';
+    // Detectar si es del sistema anterior
+    const esSistemaAnterior = item.sistema_anterior === true;
+    const claseFila = esSistemaAnterior ? 'fila-sistema-anterior' : '';
+    const iconoAnterior = esSistemaAnterior ? '<i class="fas fa-archive" title="Sistema Anterior" style="color: #6c757d; margin-left: 0.5rem; font-size: 0.75rem;"></i>' : '';
+    
+    // Determinar badge de estado
+    let estadoTexto, claseBadge, iconoEstado;
+    
+    if (esSistemaAnterior) {
+      // Registros históricos
+      estadoTexto = 'Histórico';
+      claseBadge = 'historico';
+      iconoEstado = '<i class="fas fa-archive"></i>';
+    } else {
+      // Registros del sistema actual
+      const estado = item.estado || 'N';
+      estadoTexto = estado === 'R' ? 'Rechazada' : estado === 'A' ? 'Aceptada' : 'Pendiente';
+      claseBadge = estado === 'R' ? 'rechazada' : estado === 'A' ? 'aceptada' : 'pendiente';
+      iconoEstado = estado === 'R' ? '<i class="fas fa-times-circle"></i>' : 
+                   estado === 'A' ? '<i class="fas fa-check-circle"></i>' : 
+                   '<i class="fas fa-clock"></i>';
+    }
 
     const tr = document.createElement('tr');
+    tr.className = claseFila;
     tr.innerHTML = `
       <td><strong>#${idx + 1}</strong></td>
-      <td><strong style="color: #5B7FD5;">${item.consecutivo}</strong></td>
+      <td><strong style="color: #5B7FD5;">${item.consecutivo}${iconoAnterior}</strong></td>
       <td><strong>${item.historia}</strong></td>
       <td><span style="background: #e3f2fd; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-weight: 600;">${item.ingreso}</span></td>
       <td>${item.tipoId}</td>
       <td>${item.identificacion}</td>
-      <td style="font-weight: 500;">${item.nombre}</td>
+      <td style="font-weight: 500;">${decodificarHTML(item.nombre)}</td>
       <td>${soloFecha(item.fecha_ingreso) || ''}</td>
       <td>${soloFecha(item.fecha_egreso) || ''}</td>
       <td>${soloFecha(item.fecha_traslado) || ''}</td>

@@ -73,6 +73,119 @@ body {
   margin-bottom: 1.5rem;
 }
 
-.btn-success {
+/* ========== BOTONES MODERNOS ========== */
+.btn {
   font-weight: 600;
+  padding: 0.65rem 1.5rem;
+  border-radius: 0.5rem;
+  transition: all 0.3s ease;
+  border: none;
+  font-size: 0.95rem;
+  letter-spacing: 0.3px;
+}
+
+.btn-primary,
+.btn-danger {
+  background: linear-gradient(120deg, #0d6efd 0%, #1f9bff 50%, #4cc3ff 100%);
+  box-shadow: 0 4px 15px rgba(13, 110, 253, 0.25);
+  border: none;
+  color: #fff;
+}
+
+.btn-primary:hover,
+.btn-danger:hover {
+  background: linear-gradient(120deg, #0b5ed7 0%, #1687ff 50%, #3ab5ff 100%);
+  box-shadow: 0 8px 24px rgba(13, 110, 253, 0.35);
+  transform: translateY(-2px);
+}
+
+.btn-success {
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  box-shadow: 0 4px 15px rgba(17, 153, 142, 0.4);
+  border: none;
+  font-weight: 600;
+}
+
+.btn-success:hover {
+  background: linear-gradient(135deg, #38ef7d 0%, #11998e 100%);
+  box-shadow: 0 6px 20px rgba(17, 153, 142, 0.6);
+  transform: translateY(-2px);
+}
+
+.btn-secondary {
+  background: linear-gradient(135deg, #8e9eab 0%, #eef2f3 100%);
+  color: #333;
+  box-shadow: 0 4px 15px rgba(142, 158, 171, 0.3);
+  border: none;
+  font-weight: 600;
+}
+
+.btn-secondary:hover {
+  background: linear-gradient(135deg, #eef2f3 0%, #8e9eab 100%);
+  transform: translateY(-2px);
+}
+
+.btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.btn i {
+  margin-right: 0.5rem;
+}
+
+/* ========== PROGRESO MODERNO ========== */
+#progress-container {
+  background: linear-gradient(145deg, #f8fbff 0%, #eef3ff 100%);
+  border: 1px solid #dfe7f3;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(27, 68, 138, 0.08);
+  padding: 16px;
+}
+
+#tabla-resumen {
+  border-collapse: separate;
+  border-spacing: 0;
+  background: transparent;
+}
+
+#tabla-resumen thead th {
+  background: linear-gradient(120deg, #0d6efd 0%, #1f9bff 100%);
+  color: #fff;
+  border: none;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  padding: 12px 14px;
+}
+
+#tabla-resumen thead th:first-child {
+  border-top-left-radius: 12px;
+}
+
+#tabla-resumen thead th:last-child {
+  border-top-right-radius: 12px;
+}
+
+#tabla-resumen tbody td {
+  background: #fff;
+  border: none;
+  border-bottom: 1px solid #eef2f8;
+  padding: 12px 14px;
+  vertical-align: middle;
+  color: #334;
+}
+
+#tabla-resumen tbody tr:last-child td {
+  border-bottom: none;
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+}
+
+#tabla-resumen tbody tr {
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+
+#tabla-resumen tbody tr:hover {
+  background: #f0f6ff;
+  transform: translateY(-1px);
 }
