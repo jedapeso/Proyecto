@@ -16,13 +16,13 @@
       <h1 class="logo mb-4"><i class="fas fa-user-md"></i> Cirugía</h1>
 
       <div class="menu-block">
-        <p class="menu-title"><i class="fas fa-file-alt me-2"></i>REPORTES</p>
-        <a href="#" id="opcion-programacion" class="menu-link">Programación de Turnos</a>
+        <p class="menu-title"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align:sub; margin-right:6px"><path d="M7 10h10M7 14h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> REPORTES</p>
+        <a href="#" id="opcion-programacion" class="menu-link"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M8 7V3M16 7V3M3 11h18M5 21h14a2 2 0 0 0 2-2V8H3v11a2 2 0 0 0 2 2z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg> Programación de Turnos</a>
       </div>
 
       <div class="menu-block">
-        <p class="menu-title"><i class="fas fa-chart-bar me-2"></i>ESTADÍSTICAS</p>
-        <a href="#" id="opcion-estadisticas" class="menu-link">Datos Estadísticos</a>
+        <p class="menu-title"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align:sub; margin-right:6px"><path d="M3 3h18v18H3V3z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg> ESTADÍSTICAS</p>
+        <a href="#" id="opcion-estadisticas" class="menu-link"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 3v18h18" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 14v-4M12 17v-7M17 11v-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg> Datos Estadísticos</a>
       </div>
 
       <a href="{{ url_for('main.index') }}" class="back-link mt-4">
@@ -39,28 +39,67 @@
       <!-- ESTADÍSTICAS -->
       <div id="contenido-estadisticas" class="report-card d-none">
         <h4><i class="fas fa-notes-medical me-2"></i>Reporte Estadísticas Cirugía</h4>
-        <form method="POST" action="{{ url_for('cirugia.estadisticas') }}">
+        {% if error_estadisticas %}
+        <div class="alert alert-danger" role="alert">
+          {{ error_estadisticas }}
+        </div>
+        {% endif %}
+        <form id="form-estadisticas" method="POST" action="{{ url_for('cirugia.estadisticas') }}">
           <div class="row g-3 align-items-end">
             <div class="col-md-4">
-              <label>Fecha Inicio</label>
-              <input type="date" name="fecha_inicio" class="form-control" required>
+              <label for="fecha_inicio" class="form-label mb-1">Fecha Inicio</label>
+              <div class="floating">
+                <input type="date" id="fecha_inicio" name="fecha_inicio" class="form-control" required>
+              </div>
             </div>
             <div class="col-md-4">
-              <label>Fecha Fin</label>
-              <input type="date" name="fecha_fin" class="form-control" required>
+              <label for="fecha_fin" class="form-label mb-1">Fecha Fin</label>
+              <div class="floating">
+                <input type="date" id="fecha_fin" name="fecha_fin" class="form-control" required>
+              </div>
             </div>
-            <div class="col-md-4">
-              <button type="submit" class="btn btn-success w-100">
-                <i class="fas fa-file-excel"></i> Descargar Excel
+            <div class="col-md-4 text-end">
+              <input type="hidden" name="usuario_id" id="usuario_id">
+              <button type="submit" class="btn btn-success w-100" id="btn-descargar" disabled>
+                <i class="fas fa-file-excel me-2"></i> Descargar Excel
               </button>
+              <div id="fecha-error" class="mt-2 d-none"></div>
             </div>
           </div>
         </form>
+
+        <!-- progress panel -->
+        <div id="progress-panel" class="card mt-4 d-none shadow-sm">
+          <div class="card-body text-center py-4">
+            <h5 id="progress-title" class="card-title mb-3">Generando reporte</h5>
+            <div id="progress-spinner" class="mb-2">
+              <div class="spinner-border text-primary" role="status" style="width:3rem;height:3rem;">
+                <span class="visually-hidden">Cargando...</span>
+              </div>
+            </div>
+            <p id="progress-subtitle" class="card-text text-muted mb-0 small">Iniciando...</p>
+          </div>
+        </div>
+
+        <!-- download success toast -->
+        <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1080;">
+          <div id="download-success-toast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+              <div class="toast-body">Descarga completada. ¡Gracias!</div>
+              <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Programación de Turnos -->
         <div id="contenido-programacion" class="report-card d-none">
         <h4><i class="fas fa-calendar-check me-2"></i>Programación de Turnos</h4>
+        {% if error_programacion %}
+        <div class="alert alert-danger" role="alert">
+          {{ error_programacion }}
+        </div>
+        {% endif %}
         <form method="POST" action="{{ url_for('cirugia.programacion_turnos_excel') }}">
          <div class="row g-3 align-items-end">
           <div class="col-md-4">
@@ -86,5 +125,6 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="{{ url_for('static', filename='cirugia/js/dashboard.js') }}"></script>
 {% endblock %}

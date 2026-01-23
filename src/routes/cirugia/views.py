@@ -1,8 +1,10 @@
-from flask import render_template, request, send_file
+from flask import render_template, request, send_file, jsonify
 from src import engine
 from sqlalchemy import text
 import pandas as pd
 import io
+import uuid
+from datetime import datetime
 
 from . import cirugia_bp
 
@@ -19,11 +21,30 @@ def estadisticas():
 
     fecha_inicio = request.form.get('fecha_inicio')
     fecha_fin = request.form.get('fecha_fin')
+    usuario_id = request.form.get('usuario_id') or str(uuid.uuid4())
 
     if not fecha_inicio or not fecha_fin:
         return render_template('cirugia/dashboard.html')
 
+    # Validación: fecha_inicio no puede ser mayor que fecha_fin
     try:
+        fi = datetime.strptime(fecha_inicio, '%Y-%m-%d')
+        ff = datetime.strptime(fecha_fin, '%Y-%m-%d')
+        if fi > ff:
+            return render_template('cirugia/dashboard.html', error_estadisticas='La fecha inicio no puede ser mayor que la fecha fin')
+    except ValueError:
+        return render_template('cirugia/dashboard.html', error_estadisticas='Formato de fecha inválido')
+
+    try:
+        # Progreso en Redis
+        try:
+            from src.extensions import redis_client as r
+            logs_key = f"logs:cirugia:{usuario_id}"
+            r.delete(logs_key)
+            r.rpush(logs_key, "🚀 Iniciando generación de estadísticas...")
+        except Exception:
+            r = None
+            logs_key = None
         with engine.begin() as conn:
             # Ejecutar SP que llena las tablas temporales
             conn.execute(
@@ -33,24 +54,24 @@ def estadisticas():
 
             # Diccionario con nombre de hoja y tabla
             tablas = {
-                #'POR TIPO ANESTESIA': "CIRTIPANE",
-                #'POR EDAD': "CIREDAD",
-                #'POR EMPRESA': "CIREMPR",
-                #'POR RESPONSABLE': "CIRRESP",
-                #'POR ESPECIALIDAD': "CIRESPC",
-                #'POR MEDICO': "CIRMEDIC",
-                #'POR DURACION': "CIRDURA",
-                #'DETALLADO': "CIRDETA",
-                #'10 MAS COMUNES': "CIRMASCO",
-                #'POR TIEMPO ESPERA': "CIRPROG",
-                #'POR TIPO': "CIRTIPO",
-                #'RESUMEN': "RESUMEN",
-                #'POR REINTERVENCION': "REINTER",
-                #'POR COMPLICACION': "CIRCOMPLICA",
-                #'OPORTUNIDAD ATENCION': "CIRDATFIN",
-                #'TIEMPO PROMEDIO PROCE': "PROCED1",
-                #'CIRUGIAS TOTALES': "NOPROCED",
-                #'AMBULATORIA Y HOSPITALIZADA': "TIPAC1",
+                'POR TIPO ANESTESIA': "CIRTIPANE",
+                'POR EDAD': "CIREDAD",
+                'POR EMPRESA': "CIREMPR",
+                'POR RESPONSABLE': "CIRRESP",
+                'POR ESPECIALIDAD': "CIRESPC",
+                'POR MEDICO': "CIRMEDIC",
+                'POR DURACION': "CIRDURA",
+                'DETALLADO': "CIRDETA",
+                '10 MAS COMUNES': "CIRMASCO",
+                'POR TIEMPO ESPERA': "CIRPROG",
+                'POR TIPO': "CIRTIPO",
+                'RESUMEN': "RESUMEN",
+                'POR REINTERVENCION': "REINTER",
+                'POR COMPLICACION': "CIRCOMPLICA",
+                'OPORTUNIDAD ATENCION': "CIRDATFIN",
+                'TIEMPO PROMEDIO PROCE': "PROCED1",
+                'CIRUGIAS TOTALES': "NOPROCED",
+                'AMBULATORIA Y HOSPITALIZADA': "TIPAC1",
                 'PROFILAXIS ANTIBIOTICA': "PROFIX1",
             }
 
@@ -74,6 +95,8 @@ def estadisticas():
                         print(f"⚠️ Error con tabla {tabla}: {e}")
                         continue
 
+        if r and logs_key:
+            r.rpush(logs_key, "Reporte generado correctamente")
         output.seek(0)
         return send_file(
             output,
@@ -83,7 +106,30 @@ def estadisticas():
         )
 
     except Exception as e:
+        try:
+            if r and logs_key:
+                r.rpush(logs_key, f"❌ Error: {e}")
+        except Exception:
+            pass
         return f"❌ Error al generar reporte de Estadísticas de Cirugía: {e}", 500
+
+
+@cirugia_bp.route('/estadisticas_logs/<usuario_id>', methods=['GET'])
+def estadisticas_logs(usuario_id):
+    """Retorna los logs de progreso para el usuario dado."""
+    try:
+        from src.extensions import redis_client as r
+        logs_key = f"logs:cirugia:{usuario_id}"
+        raw_logs = r.lrange(logs_key, 0, -1)
+        logs = [l.decode('utf-8', errors='ignore') if isinstance(l, bytes) else str(l) for l in raw_logs]
+        finalizado = any(('Reporte generado' in m) or ('🏁' in m) for m in logs)
+        return jsonify({
+            'usuario_id': usuario_id,
+            'logs': logs,
+            'finalizado': finalizado
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 def ajustar_columnas(writer, sheet_name, df):
@@ -200,6 +246,15 @@ def programacion_turnos_excel():
 
     if not fecha_inicio or not fecha_fin:
         return render_template('cirugia/dashboard.html')
+
+    # Validación: fecha_inicio no puede ser mayor que fecha_fin
+    try:
+        fi = datetime.strptime(fecha_inicio, '%Y-%m-%d')
+        ff = datetime.strptime(fecha_fin, '%Y-%m-%d')
+        if fi > ff:
+            return render_template('cirugia/dashboard.html', error_programacion='La fecha inicio no puede ser mayor que la fecha fin')
+    except ValueError:
+        return render_template('cirugia/dashboard.html', error_programacion='Formato de fecha inválido')
 
     try:
         with engine.begin() as conn:

@@ -1,7 +1,7 @@
 flask
 pandas
 sqlalchemy
-ibm_db
+ibm_db==3.2.6
 ibm_db_sa
 xlsxwriter
 reportlab

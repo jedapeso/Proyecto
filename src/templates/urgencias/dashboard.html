@@ -82,7 +82,7 @@
      <!-- CIRCULAR 256 -->
       <div id="contenido-cir256" class="report-card d-none">
         <h4><i class="fas fa-file-medical-alt me-2"></i>Reporte Circular 256</h4>
-        <form method="POST" action="{{ url_for('urgencias.cir256') }}">
+        <form method="POST" action="{{ url_for('urgencias.cir256_start') }}">
           <div class="row g-3 align-items-end">
             <div class="col-md-4">
               <label>Fecha Inicio</label>
@@ -93,10 +93,21 @@
               <input type="date" name="fecha_fin" class="form-control" required>
             </div>
             <div class="col-md-4">
-              <button type="submit" class="btn btn-warning w-100">
+              <button type="button" id="cir256-submit" class="btn btn-warning w-100">
                 <i class="fas fa-file-archive"></i> Descargar ZIP
               </button>
             </div>
+          </div>
+        </form>
+        <!-- Panel de fase y log -->
+        <div class="mt-3">
+          <div id="cir256-status" class="small text-muted">
+            <div id="cir256-status-text">Inactivo</div>
+          </div>
+          <div id="cir256-spinner" class="mt-2 text-center d-none">
+            <div class="spinner-grow text-warning" role="status" aria-hidden="true"></div>
+          </div>
+        </div>
           </div>
         </form>
       </div>

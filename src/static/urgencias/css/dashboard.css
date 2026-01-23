@@ -63,6 +63,16 @@ body {
   padding: 2rem;
 }
 
+/* Estilos para CIR256 status y spinner */
+#cir256-status-text {
+  font-weight: 600;
+  color: #333;
+}
+#cir256-spinner .spinner-grow {
+  width: 2rem;
+  height: 2rem;
+}
+
 .report-header h4 {
   font-weight: 700;
   margin-bottom: 0.3rem;

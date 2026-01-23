@@ -101,76 +101,73 @@ def buscar_historia():
 
 @archivo_bp.route('/guardar-traslado', methods=['POST'])
 def guardar_traslado():
-    """Guarda el traslado de historias en las tablas TRAENC y TRADET"""
+    """Guarda el traslado de historias en las tablas TRAENC y TRADET, usando control de consecutivo seguro"""
     try:
         data = request.get_json()
-        
-        # Extraer datos del formulario
         origen = data.get('centroOrigen')
         destino = data.get('centroDestino')
         fecha = data.get('fecha')
         historias = data.get('historias', [])
-        
-        # Obtener usuario de la sesión
-        usuario = 'SISTEMA'  # Por defecto, se puede cambiar si hay sesión activa
-        
+        usuario = 'SISTEMA'  # O usa el usuario real de sesión
+
         # Validaciones
         if not origen or not destino:
             return jsonify({'success': False, 'error': 'Centro de origen y destino son requeridos'}), 400
-        
         if not historias or len(historias) == 0:
             return jsonify({'success': False, 'error': 'Debe agregar al menos una historia'}), 400
-        
+
         with engine.begin() as conn:
-            # Paso 1: Insertar encabezado y obtener consecutivo
-            conn.execute(
-                text("EXECUTE PROCEDURE SP_TR_insencd(:origen, :destino, :usuario)"),
-                {
-                    'origen': origen,
-                    'destino': destino,
-                    'usuario': usuario
-                }
-            )
-            
-            # Obtener el consecutivo generado desde la tabla temporal CONSEC1
-            result_consec = conn.execute(text("SELECT SECUENCIA FROM CONSEC1"))
-            consec_row = result_consec.fetchone()
-            
-            if not consec_row:
-                return jsonify({'success': False, 'error': 'Error al generar consecutivo'}), 500
-            
-            consecutivo = consec_row[0]
-            print(f"DEBUG - Consecutivo generado: {consecutivo}")
-            
-            # Paso 2: Insertar detalles de cada historia
+            # 1. Bloquea y lee el último consecutivo
+            result = conn.execute(text("SELECT ultimo FROM TRAS_SEQ_LOCK FOR UPDATE"))
+            row = result.fetchone()
+            if not row:
+                return jsonify({'success': False, 'error': 'No se encontró consecutivo inicial en TRAS_SEQ_LOCK'}), 500
+            actual = row[0]
+            prefix = actual[:2]
+            number = int(actual[2:]) + 1
+            nuevo_consecutivo = f"{prefix}{str(number).zfill(6)}"
+
+            # 2. Inserta encabezado
+            conn.execute(text("""
+                INSERT INTO TRAENC (TRAENCCOD, TRAENCORI, TRAENCDES, TRAENCFEC, TRAENCUSR, TRAENCCON, TRAENCIND, TRAENCCST, TRAENCEST, TRAENCOBS)
+                VALUES (:consec, :origen, :destino, TODAY, :usuario, CURRENT, NULL, NULL, 'N', NULL)
+            """), {
+                'consec': nuevo_consecutivo,
+                'origen': origen,
+                'destino': destino,
+                'usuario': usuario
+            })
+
+            # 3. Inserta detalles
             linea = 1
             for historia in historias:
-                conn.execute(
-                    text("""EXECUTE PROCEDURE SP_TR_insdetd(
-                        :linea, :historia, :ingreso, :tipoid, :id, :nombre, 
-                        :fec_ing, :fec_egr
-                    )"""),
-                    {
-                        'linea': linea,
-                        'historia': int(historia.get('historia', 0)),
-                        'ingreso': int(historia.get('ingreso', 1)),
-                        'tipoid': historia.get('tipoId', ''),
-                        'id': historia.get('identificacion', ''),
-                        'nombre': historia.get('nombre', ''),
-                        'fec_ing': historia.get('fechaIngreso') if historia.get('fechaIngreso') else None,
-                        'fec_egr': historia.get('fechaEgreso') if historia.get('fechaEgreso') else None
-                    }
-                )
+                conn.execute(text("""
+                    INSERT INTO TRADET (TRADETCOD, TRADETCON, TRADETHIS, TRADETNUM, TRADETTIP, TRADETIDE, TRADETNOM, TRADETFIN, TRADETFEG, TRADETFTR, TRADESEST, TRADETOBS)
+                    VALUES (:consec, :linea, :historia, :ingreso, :tipoid, :id, :nombre, :fec_ing, :fec_egr, CURRENT, 'N', NULL)
+                """), {
+                    'consec': nuevo_consecutivo,
+                    'linea': linea,
+                    'historia': int(historia.get('historia', 0)),
+                    'ingreso': int(historia.get('ingreso', 1)),
+                    'tipoid': historia.get('tipoId', ''),
+                    'id': historia.get('identificacion', ''),
+                    'nombre': historia.get('nombre', ''),
+                    'fec_ing': historia.get('fechaIngreso') if historia.get('fechaIngreso') else None,
+                    'fec_egr': historia.get('fechaEgreso') if historia.get('fechaEgreso') else None
+                })
                 linea += 1
-            
-            # El commit es automático al salir del bloque with engine.begin()
+
+            # 4. Actualiza la tabla de control SOLO si todo fue bien
+            conn.execute(text("UPDATE TRAS_SEQ_LOCK SET ultimo = :nuevo"), {'nuevo': nuevo_consecutivo})
+
+            # Commit automático al salir del with
             return jsonify({
                 'success': True,
                 'message': f'Traslado guardado exitosamente',
-                'consecutivo': consecutivo,
+                'consecutivo': nuevo_consecutivo,
                 'registros': len(historias)
             })
-        
+
     except Exception as e:
         error_msg = str(e)
         print(f"Error en guardar_traslado: {error_msg}")
