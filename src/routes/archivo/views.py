@@ -127,34 +127,29 @@ def guardar_traslado():
             number = int(actual[2:]) + 1
             nuevo_consecutivo = f"{prefix}{str(number).zfill(6)}"
 
-            # 2. Inserta encabezado
-            conn.execute(text("""
-                INSERT INTO TRAENC (TRAENCCOD, TRAENCORI, TRAENCDES, TRAENCFEC, TRAENCUSR, TRAENCCON, TRAENCIND, TRAENCCST, TRAENCEST, TRAENCOBS)
-                VALUES (:consec, :origen, :destino, TODAY, :usuario, CURRENT, NULL, NULL, 'N', NULL)
-            """), {
-                'consec': nuevo_consecutivo,
-                'origen': origen,
-                'destino': destino,
-                'usuario': usuario
-            })
+            # 2. Inserta encabezado usando SP que recibe el consecutivo (TRAS_SEQ_LOCK gobierna el número)
+            conn.execute(
+                text("EXECUTE PROCEDURE SP_TR_insencd(:consec, :origen, :destino, :usuario)"),
+                {'consec': nuevo_consecutivo, 'origen': origen, 'destino': destino, 'usuario': usuario}
+            )
 
-            # 3. Inserta detalles
+            # 3. Inserta detalles usando SP que recibe el consecutivo
             linea = 1
             for historia in historias:
-                conn.execute(text("""
-                    INSERT INTO TRADET (TRADETCOD, TRADETCON, TRADETHIS, TRADETNUM, TRADETTIP, TRADETIDE, TRADETNOM, TRADETFIN, TRADETFEG, TRADETFTR, TRADESEST, TRADETOBS)
-                    VALUES (:consec, :linea, :historia, :ingreso, :tipoid, :id, :nombre, :fec_ing, :fec_egr, CURRENT, 'N', NULL)
-                """), {
-                    'consec': nuevo_consecutivo,
-                    'linea': linea,
-                    'historia': int(historia.get('historia', 0)),
-                    'ingreso': int(historia.get('ingreso', 1)),
-                    'tipoid': historia.get('tipoId', ''),
-                    'id': historia.get('identificacion', ''),
-                    'nombre': historia.get('nombre', ''),
-                    'fec_ing': historia.get('fechaIngreso') if historia.get('fechaIngreso') else None,
-                    'fec_egr': historia.get('fechaEgreso') if historia.get('fechaEgreso') else None
-                })
+                conn.execute(
+                    text("EXECUTE PROCEDURE SP_TR_insdetd(:consec, :linea, :historia, :ingreso, :tipoid, :id, :nombre, :fec_ing, :fec_egr)"),
+                    {
+                        'consec': nuevo_consecutivo,
+                        'linea': linea,
+                        'historia': int(historia.get('historia', 0)),
+                        'ingreso': int(historia.get('ingreso', 1)),
+                        'tipoid': historia.get('tipoId', ''),
+                        'id': historia.get('identificacion', ''),
+                        'nombre': historia.get('nombre', ''),
+                        'fec_ing': historia.get('fechaIngreso') if historia.get('fechaIngreso') else None,
+                        'fec_egr': historia.get('fechaEgreso') if historia.get('fechaEgreso') else None
+                    }
+                )
                 linea += 1
 
             # 4. Actualiza la tabla de control SOLO si todo fue bien

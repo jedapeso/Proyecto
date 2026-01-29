@@ -63,6 +63,14 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     volumes:
       - .:/app
-    # Limitar a 4 tareas activas reales (prefetch=1)
-    command: celery -A src.celery_worker.celery worker --loglevel=info --concurrency=4 --pool=prefork --prefetch-multiplier=1
+    # Fijar prefetch multiplier a 1 para reducir que un worker acapare muchas tareas largas
+    command: celery -A src.celery_worker.celery worker 
+             --loglevel=info 
+             --concurrency=10 
+             --pool=prefork 
+             --prefetch-multiplier=1
+             --autoscale=10,3
+             --max-tasks-per-child=100
+             --without-gossip
+             --without-mingle
     restart: always

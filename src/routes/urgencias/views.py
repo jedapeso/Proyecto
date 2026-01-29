@@ -62,15 +62,30 @@ def run_cir256_job(job_id, fecha_inicio, fecha_fin):
                 try:
                     df = pd.read_sql(f"SELECT * FROM {tabla};", conn)
                     if not df.empty:
+                        # Limpiar valores especiales y eliminar saltos de línea dentro de campos
                         df_clean = df.replace(['None', 'none'], '')
-                        txt_total += df_clean.to_csv(
-                            sep='|', index=False, header=False, lineterminator='\n'
-                        )
+                        df_clean = df_clean.replace({r'[\r\n]+' : ' '}, regex=True)
+
+                        # Exportar con separador '|' y terminador CRLF (requerido por el receptor)
+                        csv_text = df_clean.to_csv(sep='|', index=False, header=False, lineterminator='\r\n')
+
+                        # Evitar líneas en blanco al concatenar (no añadir separador si txt_total está vacío)
+                        if not txt_total:
+                            txt_total = csv_text
+                        else:
+                            if not txt_total.endswith('\r\n'):
+                                txt_total += '\r\n'
+                            txt_total += csv_text
+
                         logging.debug(f"✅ {tabla} añadido con {df.shape[0]} registros.")
                     else:
                         logging.debug(f"⚠️ {tabla} está vacía.")
                 except Exception as ex:
                     logging.warning(f"❌ {tabla} omitido. Detalle: {ex}")
+
+            # Quitar posibles líneas iniciales vacías y mostrar vista previa para depuración
+            txt_total = txt_total.lstrip('\r\n')
+            logging.debug('Vista previa TXT (inicio): %s', repr(txt_total[:200]))
 
             if not txt_total.strip():
                 logging.warning("⚠️ No hay datos en los anexos para generar el TXT")
@@ -78,7 +93,8 @@ def run_cir256_job(job_id, fecha_inicio, fecha_fin):
             fecha_txt = datetime.strptime(fecha_fin, "%Y-%m-%d").strftime("%Y%m%d")
             nombre_txt = f"MCA195MOCA{fecha_txt}NI000890100275C01.txt"
 
-            txt_buffer = io.BytesIO(txt_total.encode('utf-8-sig'))
+            # Usar UTF-8 sin BOM para evitar caracteres ocultos en el primer campo
+            txt_buffer = io.BytesIO(txt_total.encode('utf-8'))
             txt_buffer.seek(0)
 
             # Crear ZIP en archivo temporal

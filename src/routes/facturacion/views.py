@@ -129,7 +129,7 @@ def enviar_reporte_cargos():
     """
     try:
         usuario_id = str(uuid.uuid4())
-        # Procesar todos los años: 2026 → 2006 (desc)
+        # Empezar el proceso desde 2026 hasta 2006 (descendente)
         anios = list(range(2026, 2006 - 1, -1))
 
         # Limpieza previa en Redis
@@ -209,14 +209,10 @@ def cancelar_reporte_cargos_route():
     Marca el proceso como cancelado desde Celery y Redis.
     """
     try:
-        payload = request.get_json(silent=True) or {}
-        usuario_id = payload.get("usuario_id") or request.form.get("usuario_id")
-
-        cancelar_reporte_cargos.apply_async(args=[usuario_id])
+        cancelar_reporte_cargos.apply_async()
         return jsonify({
             "status": "cancelado",
-            "mensaje": "🛑 Proceso cancelado correctamente.",
-            "usuario_id": usuario_id
+            "mensaje": "🛑 Proceso cancelado correctamente."
         }), 200
     except Exception as e:
         logging.error(f"❌ Error al cancelar proceso: {e}", exc_info=True)

@@ -52,32 +52,29 @@ result = conn.execute(text("SELECT * FROM CONSUL1"))
 
 ---
 
-### 3️⃣ **SP_TR_insencd(origen, destino, usuario)**
+### 3️⃣ **SP_TR_insencd(consec, origen, destino, usuario)**
 **Ubicación:** `guardar_traslado()` línea 127
 
-**Propósito:** Crear un encabezado de traslado (TRAENC) y generar consecutivo
+**Propósito:** Insertar un encabezado de traslado (`TRAENC`) usando el `consec` proporcionado por la aplicación (controlado por `TRAS_SEQ_LOCK`).
 
 **Parámetros:**
+- `consec` (CHAR(8)): Consecutivo generado por la aplicación (ej. 'HC000004')
 - `origen` (VARCHAR): Código del centro de origen
 - `destino` (VARCHAR): Código del centro de destino
 - `usuario` (VARCHAR): Usuario que crea el traslado (default 'SISTEMA')
 
-**Tabla Temporal Generada:** `CONSEC1`
-- Campo: `SECUENCIA` - El consecutivo autogenerado
-
 **Tabla Afectada:** `TRAENC` (encabezado de traslados)
-- Inserta: origen, destino, usuario, fecha actual, estado='N'
+- Inserta: consec, origen, destino, usuario, fecha actual, estado='N'
 
-**Uso:**
+**Uso (la aplicación genera `consec` desde `TRAS_SEQ_LOCK` y lo pasa al SP):**
 ```python
+# ejemplo simplificado
+# generar nuevo_consecutivo (SELECT FOR UPDATE ... calcular ...)
 conn.execute(
-    text("EXECUTE PROCEDURE SP_TR_insencd(:origen, :destino, :usuario)"),
-    {'origen': 'CTR001', 'destino': 'CTR002', 'usuario': 'SISTEMA'}
+    text("EXECUTE PROCEDURE SP_TR_insencd(:consec, :origen, :destino, :usuario)"),
+    {'consec': nuevo_consecutivo, 'origen': 'CTR001', 'destino': 'CTR002', 'usuario': 'SISTEMA'}
 )
-result_consec = conn.execute(text("SELECT SECUENCIA FROM CONSEC1"))
-consecutivo = result_consec.fetchone()[0]
 ```
-
 ---
 
 ### 4️⃣ **SP_TR_insdetd(linea, historia, ingreso, tipoid, id, nombre, fec_ing, fec_egr)**
@@ -98,15 +95,16 @@ consecutivo = result_consec.fetchone()[0]
 **Tabla Afectada:** `TRADET` (detalle de traslados)
 - Inserta con estado='N' (pendiente)
 
-**Uso:**
+**Uso (la aplicación pasa `consec` al SP):**
 ```python
 for historia in historias:
     conn.execute(
         text("""EXECUTE PROCEDURE SP_TR_insdetd(
-            :linea, :historia, :ingreso, :tipoid, :id, :nombre, 
+            :consec, :linea, :historia, :ingreso, :tipoid, :id, :nombre, 
             :fec_ing, :fec_egr
         )"""),
         {
+            'consec': nuevo_consecutivo,
             'linea': 1,
             'historia': 80321,
             'ingreso': 1,
@@ -310,7 +308,7 @@ WHERE TRAENCCOD = :consecutivo
 |---|---|---|---|
 | **UBICA1** | SP_UbicaTransd | CCOCOD, CCONOM | Centros de costo disponibles |
 | **CONSUL1** | SP_TR_CondetHis | PACTID, PACIDE, NOMBRE, EPIINAFEN, EPIINAFAL | Datos de paciente y validación |
-| **CONSEC1** | SP_TR_insencd | SECUENCIA | Consecutivo autogenerado |
+| **(no aplica)** | SP_TR_insencd | SECUENCIA | El consecutivo es generado por `TRAS_SEQ_LOCK` en la aplicación (no se usa tabla temporal) |
 | **BUSEXP1** | SP_TR_BuscaExpHiIng, SP_TR_BuscaExpHi, SP_TR_BuscaExpCed | 12 columnas de expediente | Búsqueda de expedientes |
 
 ---

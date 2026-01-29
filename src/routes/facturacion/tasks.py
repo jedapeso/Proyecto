@@ -71,23 +71,11 @@ def es_cancelado():
 # TAREA PARA MARCAR CANCELACIÓN
 # ==========================================================
 @celery.task(name="cancelar_reporte_cargos")
-def cancelar_reporte_cargos(usuario_id=None):
-    """Marca el proceso de reporte como cancelado en Redis y señala el progreso del usuario."""
+def cancelar_reporte_cargos():
+    """Marca el proceso de reporte como cancelado en Redis."""
     try:
         r.set(CANCEL_KEY, "1", ex=600)  # 10 minutos por defecto
         logging.warning("🛑 Se marcó el proceso de reporte como CANCELADO.")
-
-        if usuario_id:
-            progreso_key = f"progreso:{usuario_id}"
-            try:
-                safe_push_log(usuario_id, "🛑 Cancelación solicitada por el usuario.")
-                safe_hset(progreso_key, "estado_global", "cancelado")
-                r.set(f"finalizado:{usuario_id}", "true", ex=3600)
-            except Exception as inner_e:
-                logging.warning(f"No se pudo marcar progreso de cancelación para {usuario_id}: {inner_e}")
-
-        # Agenda la liberación del lock después de 5 segundos (da tiempo para que los procesos se detengan)
-        celery.send_task('liberar_lock_task', countdown=5)
         return {"status": "cancelado", "mensaje": "El reporte fue cancelado correctamente."}
     except Exception as e:
         logging.error(f"❌ Error al marcar cancelación: {e}")
@@ -96,7 +84,7 @@ def cancelar_reporte_cargos(usuario_id=None):
 # ==========================================================
 # SUBTAREA CELERY - PROCESAR POR AÑO (Informix)
 # ==========================================================
-@celery.task(bind=True, name="procesar_anio", time_limit=600, soft_time_limit=550)
+@celery.task(bind=True, name="procesar_anio")
 def procesar_anio(self, usuario_id, anio):
     inicio = time.time()
     progreso_key = f"progreso:{usuario_id}"
@@ -148,7 +136,7 @@ def procesar_anio(self, usuario_id, anio):
         if not datos:
             safe_push_log(usuario_id, f"⚠️ No se encontraron registros para {anio}.")
             safe_hset(progreso_key, anio, "sin_registros")
-            return {"anio": anio, "rows": 0, "data": []}
+            return None
 
         df = pd.DataFrame(datos, columns=columnas)
         df["ANIO"] = anio
@@ -158,7 +146,7 @@ def procesar_anio(self, usuario_id, anio):
         safe_hset(progreso_key, anio, "finalizado")
         safe_push_log(usuario_id, f"✅ Año {anio} finalizado en {duracion:.2f} s.")
 
-        return {"anio": anio, "rows": len(df), "data": df.to_dict(orient="records")}
+        return df.to_dict(orient="records")
 
     except Ignore:
         # terminar silenciosamente la subtarea si se solicitó cancelación
@@ -168,10 +156,9 @@ def procesar_anio(self, usuario_id, anio):
         duracion = round(time.time() - inicio, 2)
         safe_hset(duraciones_key, anio, duracion)
         safe_hset(progreso_key, anio, "error")
-        error_msg = f"Timeout" if "time limit" in str(e).lower() else str(e)
-        safe_push_log(usuario_id, f"❌ Error procesando año {anio}: {error_msg}")
+        safe_push_log(usuario_id, f"❌ Error procesando año {anio}: {e}")
         logging.exception(e)
-        return {"anio": anio, "rows": 0, "data": [], "error": error_msg}
+        return None
 
     finally:
         try:
@@ -188,7 +175,7 @@ def procesar_anio(self, usuario_id, anio):
 # ==========================================================
 # COMBINAR Y ENVIAR (callback del chord)
 # ==========================================================
-@celery.task(bind=True, name="combinar_y_enviar", time_limit=300)
+@celery.task(bind=True, name="combinar_y_enviar")
 def combinar_y_enviar(self, resultados, usuario_id):
     """
     Callback del chord: concatena resultados, genera Excel y envía correo.
@@ -206,7 +193,7 @@ def combinar_y_enviar(self, resultados, usuario_id):
 
         safe_push_log(usuario_id, "📊 Combinando resultados...")
 
-        # Recuperar inicio_real
+        # Recuperar inicio_real (registrado en ejecutar_reporte_cargos) para medir tiempo real
         inicio_real = None
         try:
             raw_inicio = r.get(f"inicio_real:{usuario_id}")
@@ -217,84 +204,31 @@ def combinar_y_enviar(self, resultados, usuario_id):
         if not inicio_real:
             inicio_real = time.time()
 
-        resultados = resultados or []
-        validos = []
-        sin_registros = []
-        errores = []
+        resultados_validos = [pd.DataFrame(r) for r in resultados if r is not None and len(r) > 0]
+        if not resultados_validos:
+            safe_push_log(usuario_id, "⚠️ No se encontraron datos válidos.")
+            # marcar finalizado para que frontend deje de esperar
+            r.set(f"finalizado:{usuario_id}", "true", ex=3600)
+            return
 
-        for resultado in resultados:
-            if not resultado:
-                continue
-            if resultado.get("error"):
-                errores.append(resultado)
-                continue
-            data = resultado.get("data") if isinstance(resultado, dict) else resultado
-            if not data:
-                sin_registros.append(resultado.get("anio"))
-                continue
-            df_item = pd.DataFrame(data)
-            # Asegura columna ANIO si no viene
-            if "ANIO" not in df_item.columns and isinstance(resultado, dict) and resultado.get("anio"):
-                df_item["ANIO"] = resultado["anio"]
-            validos.append(df_item)
-
-        if not validos:
-            safe_push_log(usuario_id, "⚠️ No se encontraron datos válidos para combinar.")
-            # Generar un Excel vacío con mensaje y aún así enviar
-            df_final = pd.DataFrame([{"mensaje": "Sin registros"}])
-        else:
-            df_final = pd.concat(validos, ignore_index=True)
-
-        if sin_registros:
-            safe_push_log(usuario_id, f"ℹ️ Años sin registros: {', '.join(map(str, sin_registros))}")
-        if errores:
-            for err in errores:
-                safe_push_log(usuario_id, f"❌ Error en año {err.get('anio')}: {err.get('error')}")
-
+        df_final = pd.concat(resultados_validos, ignore_index=True)
         safe_push_log(usuario_id, f"🔢 Total de filas: {len(df_final)}")
 
         # Generar Excel en memoria
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             df_final.to_excel(writer, index=False, sheet_name="CargosPendientes")
-            if sin_registros:
-                pd.DataFrame({"anio": sin_registros}).to_excel(writer, index=False, sheet_name="SinRegistros")
-            if errores:
-                pd.DataFrame(errores).to_excel(writer, index=False, sheet_name="Errores")
         output.seek(0)
         safe_push_log(usuario_id, "✅ Excel generado en memoria.")
 
-        # **CAMBIO 1: Leer destinatarios desde archivo**
-        destinatarios = []
-        ruta_destinatarios = os.path.join("config", "mails", "destinatarios.txt")
-        
-        try:
-            with open(ruta_destinatarios, 'r', encoding='utf-8') as f:
-                for linea in f:
-                    email = linea.strip()
-                    # Ignorar líneas vacías o comentarios
-                    if email and not email.startswith('#'):
-                        destinatarios.append(email)
-            
-            if not destinatarios:
-                safe_push_log(usuario_id, "⚠️ No hay destinatarios en el archivo.")
-                destinatarios = ["ast_sistemas@clinicadelcaribe.com"]  # fallback
-        except FileNotFoundError:
-            safe_push_log(usuario_id, f"⚠️ Archivo {ruta_destinatarios} no encontrado. Usando destinatario por defecto.")
-            destinatarios = ["ast_sistemas@clinicadelcaribe.com"]
-        except Exception as e:
-            safe_push_log(usuario_id, f"⚠️ Error leyendo destinatarios: {e}. Usando destinatario por defecto.")
-            destinatarios = ["ast_sistemas@clinicadelcaribe.com"]
-
-        safe_push_log(usuario_id, f"📧 Enviando a {len(destinatarios)} destinatario(s)...")
-
         # Preparar correo
         remitente = SMTP_USER
+        destinatario = "ast_sistemas@clinicadelcaribe.com"
         asunto = f"Reporte Cargos Pendientes - {datetime.now():%Y-%m-%d %H:%M}"
 
         msg = MIMEMultipart()
         msg["From"] = remitente
-        msg["To"] = ", ".join(destinatarios)  # **CAMBIO 2: Múltiples destinatarios**
+        msg["To"] = destinatario
         msg["Subject"] = asunto
         msg.attach(MIMEText("Adjunto el reporte de cargos pendientes.", "plain"))
 
@@ -307,34 +241,29 @@ def combinar_y_enviar(self, resultados, usuario_id):
         safe_push_log(usuario_id, "📧 Enviando correo...")
         with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT) as server:
             server.login(remitente, SMTP_PASS)
-            server.sendmail(remitente, destinatarios, msg.as_string())  # **CAMBIO 3: Lista de destinatarios**
+            server.sendmail(remitente, destinatario, msg.as_string())
 
-        # Duración total real
+        # Duración total real (desde inicio_real hasta ahora)
         fin_real = time.time()
         duracion_total_real = round(fin_real - inicio_real, 2)
 
-        safe_push_log(usuario_id, f"✅ Reporte enviado correctamente a {len(destinatarios)} destinatario(s).")
+        safe_push_log(usuario_id, f"✅ Reporte enviado correctamente.")
         safe_push_log(usuario_id, f"⏱️ Duración total real: {duracion_total_real:.2f} s.")
 
+        # Marcar finalizado para el frontend
         r.set(f"finalizado:{usuario_id}", "true", ex=3600)
 
     except Exception as e:
         safe_push_log(usuario_id, f"❌ Error combinando o enviando: {e}")
         safe_hset(progreso_key, "estado_global", "error")
         logging.exception(e)
-        try:
-            r.set(f"finalizado:{usuario_id}", "true", ex=3600)
-        except Exception:
-            pass
 
     finally:
-        # Garantizar que el lock se libere SIEMPRE
+        # Siempre intentar liberar lock y limpiar marca de cancelación
         try:
-            if r.exists(LOCK_KEY):
-                r.delete(LOCK_KEY)
-                logging.info("🔓 Lock liberado en finalizer.")
+            liberar_lock_task.apply_async()
         except Exception as e:
-            logging.error(f"❌ Error liberando lock en finalizer: {e}")
+            logging.error(f"❌ No se pudo lanzar liberar_lock_task: {e}")
         try:
             r.delete(CANCEL_KEY)
         except Exception:
@@ -352,7 +281,6 @@ def liberar_lock_task():
             logging.info("🔓 Lock global liberado correctamente.")
         else:
             logging.info("ℹ️ Lock global ya había expirado.")
-        # NO borrar CANCEL_KEY aquí; el finalizer se encarga
     except Exception as e:
         logging.error(f"❌ Error liberando lock: {e}")
 
@@ -366,7 +294,7 @@ def ejecutar_reporte_cargos(self, usuario_id, anios):
     finalizado_key = f"finalizado:{usuario_id}"
     log_key = f"logs:{usuario_id}"
 
-    # Evitar procesos simultáneos (lock global)
+    # Evitar procesos simultáneos
     if r.exists(LOCK_KEY):
         msg = "⚙️ El reporte ya está en ejecución. Espere a que finalice."
         safe_push_log(usuario_id, msg)
@@ -404,11 +332,9 @@ def ejecutar_reporte_cargos(self, usuario_id, anios):
         return {"status": "started", "anios": anios}
 
     except Exception as e:
-        # En caso de fallo crítico, liberar lock inmediatamente
+        # En caso de fallo crítico, intentar liberar lock
         try:
-            if r.exists(LOCK_KEY):
-                r.delete(LOCK_KEY)
-                logging.info("🔓 Lock liberado tras error en orquestador.")
+            liberar_lock_task.apply_async()
         except Exception:
             pass
         logging.exception(e)
