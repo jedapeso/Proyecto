@@ -5,7 +5,6 @@ from sqlalchemy.exc import OperationalError
 from datetime import datetime
 import pandas as pd
 import io
-import logging
 from zipfile import ZipFile
 
 # Para gestión de trabajos en background
@@ -18,8 +17,6 @@ import time
 # Diccionario en memoria para seguir jobs: {job_id: {'status':..., 'log': StringIO(), 'file': path, 'error': None}}
 jobs = {}
 jobs_lock = threading.Lock()
-
-logging.basicConfig(level=logging.DEBUG)
 
 
 def run_cir256_job(job_id, fecha_inicio, fecha_fin):
@@ -34,7 +31,6 @@ def run_cir256_job(job_id, fecha_inicio, fecha_fin):
             jobs[job_id]['phase_text'] = 'Iniciando la extracción y depuración de Datos'
 
         with engine.begin() as conn:
-            logging.debug("⚙️ Ejecutando procedimiento SP_Cir256 (background)...")
             conn.execute(text("EXECUTE PROCEDURE SP_Cir256(:fini, :ffin)"), {
                 'fini': fecha_inicio,
                 'ffin': fecha_fin
@@ -77,18 +73,16 @@ def run_cir256_job(job_id, fecha_inicio, fecha_fin):
                                 txt_total += '\r\n'
                             txt_total += csv_text
 
-                        logging.debug(f"✅ {tabla} añadido con {df.shape[0]} registros.")
                     else:
-                        logging.debug(f"⚠️ {tabla} está vacía.")
+                        pass
                 except Exception as ex:
-                    logging.warning(f"❌ {tabla} omitido. Detalle: {ex}")
+                    pass
 
             # Quitar posibles líneas iniciales vacías y mostrar vista previa para depuración
             txt_total = txt_total.lstrip('\r\n')
-            logging.debug('Vista previa TXT (inicio): %s', repr(txt_total[:200]))
 
             if not txt_total.strip():
-                logging.warning("⚠️ No hay datos en los anexos para generar el TXT")
+                pass
 
             fecha_txt = datetime.strptime(fecha_fin, "%Y-%m-%d").strftime("%Y%m%d")
             nombre_txt = f"MCA195MOCA{fecha_txt}NI000890100275C01.txt"
@@ -112,16 +106,13 @@ def run_cir256_job(job_id, fecha_inicio, fecha_fin):
                     jobs[job_id]['status'] = 'finished'
                     jobs[job_id]['phase'] = 'finished'
                     jobs[job_id]['phase_text'] = 'Archivo finalizado con éxito.'
-                logging.info("✅ Job %s finalizado correctamente. ZIP: %s", job_id, tmp.name)
             except Exception as ex:
-                logging.error("❌ Error al crear ZIP para job %s: %s", job_id, ex, exc_info=True)
                 with jobs_lock:
                     jobs[job_id]['status'] = 'error'
                     jobs[job_id]['error'] = str(ex)
                     jobs[job_id]['phase'] = 'error'
                     jobs[job_id]['phase_text'] = 'Error al empaquetar el archivo'
     except Exception as e:
-        logging.error("❌ Error en ejecución de SP_Cir256 para job %s: %s", job_id, e, exc_info=True)
         with jobs_lock:
             jobs[job_id]['status'] = 'error'
             jobs[job_id]['error'] = str(e)
@@ -133,12 +124,11 @@ def run_cir256_job(job_id, fecha_inicio, fecha_fin):
             with jobs_lock:
                 file_path = jobs[job_id].get('file')
                 if file_path and os.path.exists(file_path) and jobs[job_id].get('status') != 'finished':
-                    logging.debug("🔁 Final auto-correction for job %s in finally block", job_id)
                     jobs[job_id]['status'] = 'finished'
                     jobs[job_id]['phase'] = 'finished'
                     jobs[job_id]['phase_text'] = 'Archivo finalizado con éxito.'
         except Exception:
-            logging.exception("❌ Error during final auto-correction for job %s", job_id)
+            pass
 
 from . import urgencias_bp
 
@@ -227,7 +217,6 @@ def cir256_start():
         with engine.begin() as conn:
             conn.execute(text("SELECT FIRST 1 tabid FROM systables"))
     except Exception as ex:
-        logging.error("❌ No se puede leer 'systables' en pre-check de inicio de job: %s", ex, exc_info=True)
         return { 'error': 'No se puede leer el catálogo del sistema (systables). Contacte al DBA.' }, 500
 
     job_id = str(uuid.uuid4())
@@ -245,7 +234,6 @@ def cir256_start():
     thread = threading.Thread(target=run_cir256_job, args=(job_id, fecha_inicio, fecha_fin), daemon=True)
     thread.start()
 
-    logging.info("➡️ Iniciado job CIR256 %s para %s - %s", job_id, fecha_inicio, fecha_fin)
     return { 'job_id': job_id }, 202
 
 
@@ -259,7 +247,6 @@ def cir256_status(job_id):
         # Recalcular y autocorregir estado si el archivo existe en disco
         file_path = job.get('file')
         if file_path and os.path.exists(file_path) and job.get('status') != 'finished':
-            logging.debug("🔁 Auto-correcting phase for job %s because file exists on disk", job_id)
             job['status'] = 'finished'
             job['phase'] = 'finished'
             job['phase_text'] = 'Archivo finalizado con éxito.'

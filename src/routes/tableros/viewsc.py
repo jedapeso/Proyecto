@@ -62,7 +62,6 @@ def obtener_pacientes_cirugia():
                 SELECT ciride as id, cirnom as nombre, cirest as estado, 
                        llamado, msm_llamado
                 FROM PACMCIR1
-                ORDER BY cirnom ASC
             """))
             
             pacientes = []
@@ -85,8 +84,6 @@ def obtener_pacientes_cirugia():
         })
     
     except Exception as e:
-        print("❌ Error en obtener_pacientes_cirugia:")
-        traceback.print_exc()
         return jsonify({
             "success": False,
             "error": str(e)
@@ -103,7 +100,6 @@ def obtener_pacientes_disponibles():
             result = conn.execute(text("""
                 SELECT identificacion as id, nombre
                 FROM PACCIR1
-                ORDER BY nombre ASC
             """))
             
             pacientes = []
@@ -120,8 +116,6 @@ def obtener_pacientes_disponibles():
         })
     
     except Exception as e:
-        print("❌ Error en obtener_pacientes_disponibles:")
-        traceback.print_exc()
         return jsonify({
             "success": False,
             "error": str(e)
@@ -164,8 +158,6 @@ def insertar_paciente_cirugia():
 
 
     except Exception as e:
-        print("❌ Error en insertar_paciente_cirugia:")
-        traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -197,8 +189,6 @@ def actualizar_estado_paciente():
 
 
     except Exception as e:
-        print("❌ Error en actualizar_estado_paciente:")
-        traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -227,8 +217,6 @@ def eliminar_paciente_cirugia():
 
 
     except Exception as e:
-        print("❌ Error en eliminar_paciente_cirugia:")
-        traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -267,8 +255,6 @@ def llamar_paciente():
         })
     
     except Exception as e:
-        print("❌ Error al actualizar llamado:")
-        traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -289,8 +275,6 @@ def desactivar_todos_llamados():
         })
     
     except Exception as e:
-        print("❌ Error al desactivar llamados:")
-        traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -324,8 +308,6 @@ def obtener_llamados_activos():
         return jsonify({"success": True, "llamados": llamados})
     
     except Exception as e:
-        print("❌ Error al obtener llamados activos:")
-        traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
 
 

@@ -66,5 +66,4 @@ def create_app():
     from .routes.archivo import archivo_bp
     app.register_blueprint(archivo_bp)
 
-    print("✅ Aplicación Flask creada correctamente con Celery.")
     return app

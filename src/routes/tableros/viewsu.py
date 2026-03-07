@@ -36,8 +36,6 @@ def tablero_urg():
             servicios = [{'ubicod': row['tipo'], 'ubinom': row['ubica']} for row in result]
         return render_template('tableros/tablero_urg.html', servicios=servicios)
     except Exception as e:
-        print(f"Error carga servicios: {e}")
-        traceback.print_exc()
         return render_template('tableros/tablero_urg.html', servicios=[])
 
 @tableros_bp.route('/urgencias/datos', methods=['POST'])
@@ -89,37 +87,37 @@ def obtener_datos_urg():
             try:
                 total_pacientes = conn.execute(text("SELECT TOTAL_PACIENTES FROM TOTPAC1")).scalar() or 0
             except Exception as e:
-                print(f"⚠️ Error Totales: {e}")
+                pass
 
             # B. Promedio Estancia
             try:
                 promedio_estancia = conn.execute(text("SELECT PROM FROM PROMES1")).scalar() or "0"
             except Exception as e:
-                print(f"⚠️ Error Promedio: {e}")
+                pass
 
             # C. Escala GRACE
             try:
                 escala_grace = [dict(row) for row in conn.execute(text("SELECT TRIM(ESCALAPOR) ESCALAPOR, NO_PACI FROM GRACE1")).mappings()]
             except Exception as e:
-                print(f"⚠️ Error GRACE1: {e}")
+                pass
 
             # D. Riesgo CURB-65
             try:
                 riesgo_curb65 = [dict(row) for row in conn.execute(text("SELECT TRIM(ESCALAPOR) ESCALAPOR, NO_PACI FROM CURB1")).mappings()]
             except Exception as e:
-                print(f"⚠️ Error CURB1: {e}")
+                pass
 
             # E. Riesgo CAÍDA
             try:
                 riesgo_caida = [dict(row) for row in conn.execute(text("SELECT TRIM(ESCALAPOR) ESCALAPOR, NO_PACI FROM RIECA1")).mappings()]
             except Exception as e:
-                print(f"⚠️ Error RIECA1: {e}")
+                pass
 
             # F. Riesgo NIHSS
             try:
                 riesgo_nihss = [dict(row) for row in conn.execute(text("SELECT TRIM(ESCALAPOR) ESCALAPOR, NO_PACI FROM NIHSS1")).mappings()]
             except Exception as e:
-                print(f"⚠️ Error NIHSS1: {e}")
+                pass
 
             # Retorno JSON
             return jsonify({
@@ -135,7 +133,6 @@ def obtener_datos_urg():
             })
 
     except Exception as e:
-        traceback.print_exc() # Esto imprimirá el error real en la consola de Docker
         return jsonify({"error": f"Error servidor: {str(e)}"}), 500
 
 # --------------------------------------------
@@ -170,21 +167,15 @@ def convertir_a_lenguaje_natural_urg(texto):
     content_hash = hashlib.md5(texto_normalizado.encode('utf-8')).hexdigest()
     cache_key = f"ia_resumen_urg:{content_hash}"
     
-    print(f"🔍 Hash del contenido: {content_hash[:8]}...")
-    
     # Intentar obtener del caché (TTL: 24 horas)
     try:
         cached_response = redis_client.get(cache_key)
         if cached_response:
-            print(f"✅ Usando respuesta cacheada (hash: {content_hash[:8]})")
             # Redis puede devolver str o bytes dependiendo de la configuración
             if isinstance(cached_response, bytes):
                 return cached_response.decode('utf-8')
             return cached_response
-        else:
-            print(f"❌ No hay caché disponible para este contenido")
     except Exception as e:
-        print(f"⚠️ Error accediendo caché Redis: {e}")
         # Si Redis falla y ya excedimos cuota, devolver mensaje sin intentar API
         return "⚠️ El servicio de caché no está disponible. Por favor, contacte al administrador."
 
@@ -208,16 +199,14 @@ def convertir_a_lenguaje_natural_urg(texto):
     prompt = prompt_base.replace("{texto}", texto.strip())
 
     try:
-        print(f"🤖 Generando nuevo análisis IA (hash: {content_hash})")
         response = model.generate_content(prompt)
         resultado = response.text.strip() if response and response.text else "Sin información generada"
         
         # Guardar en caché por 8 horas (28800 segundos)
         try:
             redis_client.setex(cache_key, 28800, resultado)
-            print(f"💾 Respuesta cacheada por 8 horas")
         except Exception as e:
-            print(f"⚠️ Error guardando en caché: {e}")
+            pass
             
         return resultado
     except google_exceptions.ResourceExhausted:

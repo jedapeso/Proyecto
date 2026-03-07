@@ -344,15 +344,35 @@ let DragDropTouch;
             }
             // create drag image from custom element or drag source
             let src = this._imgCustom || this._dragSource;
-            this._img = src.cloneNode(true);
-            this._copyStyle(src, this._img);
-            this._img.style.top = this._img.style.left = '-9999px';
-            // if creating from drag source, apply offset and opacity
-            if (!this._imgCustom) {
-                let rc = src.getBoundingClientRect(),
-                    pt = this._getPoint(e);
-                this._imgOffset = { x: pt.x - rc.left, y: pt.y - rc.top };
-                this._img.style.opacity = DragDropTouch._OPACITY.toString();
+            if (DragDropTouch._USE_LIGHT_IMAGE && !this._imgCustom) {
+                const size = DragDropTouch._LIGHT_IMAGE_SIZE;
+                const preview = document.createElement('div');
+                preview.style.width = size + 'px';
+                preview.style.height = size + 'px';
+                preview.style.borderRadius = '8px';
+                preview.style.background = 'rgba(2, 136, 209, 0.85)';
+                preview.style.boxShadow = '0 6px 14px rgba(0, 0, 0, 0.25)';
+                preview.style.display = 'flex';
+                preview.style.alignItems = 'center';
+                preview.style.justifyContent = 'center';
+                preview.style.color = '#ffffff';
+                preview.style.fontSize = '18px';
+                preview.style.fontWeight = '700';
+                preview.textContent = 'DRAG';
+                this._img = preview;
+                this._imgOffset = { x: size / 2, y: size / 2 };
+            }
+            else {
+                this._img = src.cloneNode(true);
+                this._copyStyle(src, this._img);
+                this._img.style.top = this._img.style.left = '-9999px';
+                // if creating from drag source, apply offset and opacity
+                if (!this._imgCustom) {
+                    let rc = src.getBoundingClientRect(),
+                        pt = this._getPoint(e);
+                    this._imgOffset = { x: pt.x - rc.left, y: pt.y - rc.top };
+                    this._img.style.opacity = DragDropTouch._OPACITY.toString();
+                }
             }
             // add image to document
             this._moveImage(e);
@@ -460,14 +480,16 @@ let DragDropTouch;
     }());
     /*private*/ DragDropTouch._instance = new DragDropTouch(); // singleton
     // constants
-    DragDropTouch._THRESHOLD = 5; // pixels to move before drag starts
+    DragDropTouch._THRESHOLD = 12; // pixels to move before drag starts
     DragDropTouch._OPACITY = 0.5; // drag image opacity
     DragDropTouch._DBLCLICK = 500; // max ms between clicks in a double click
     DragDropTouch._CTXMENU = 900; // ms to hold before raising 'contextmenu' event
     DragDropTouch._ISPRESSHOLDMODE = false; // decides of press & hold mode presence
     DragDropTouch._PRESSHOLDAWAIT = 400; // ms to wait before press & hold is detected
-    DragDropTouch._PRESSHOLDMARGIN = 25; // pixels that finger might shiver while pressing
+    DragDropTouch._PRESSHOLDMARGIN = 30; // pixels that finger might shiver while pressing
     DragDropTouch._PRESSHOLDTHRESHOLD = 0; // pixels to move before drag starts
+    DragDropTouch._USE_LIGHT_IMAGE = true; // use lightweight drag preview on touch
+    DragDropTouch._LIGHT_IMAGE_SIZE = 48; // px
     // copy styles/attributes from drag source to drag image element
     DragDropTouch._rmvAtts = 'id,class,style,draggable'.split(',');
     // synthesize and dispatch an event

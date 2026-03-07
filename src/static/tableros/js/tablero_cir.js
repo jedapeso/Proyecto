@@ -4,6 +4,25 @@ let pacientesDisponibles = [];
 let identificacionEliminar = null;
 let elementoArrastrado = null;
 let llamadoActivo = null;
+let dragInProgress = false;
+let pendingRefresh = false;
+let lastPacientesKey = '';
+
+const DOM = {
+  listas: {},
+  stats: {},
+  statsBar: null,
+  toggleStatsBtn: null,
+  buscarInput: null,
+  buscarModalInput: null,
+  horaActualizacion: null
+};
+
+const ESTADO_POR_LISTA = {
+  'lista-preparacion': 'P',
+  'lista-quirofano': 'Q',
+  'lista-recuperacion': 'R'
+};
 
 // ========== CARGAR PACIENTES (CON DETECCIÓN DE CAMBIO DE LLAMADO) ==========
 function cargarPacientes() {
@@ -11,6 +30,10 @@ function cargarPacientes() {
     .then(r => r.json())
     .then(data => {
       if (data.success && Array.isArray(data.pacientes)) {
+        if (dragInProgress) {
+          pendingRefresh = true;
+          return;
+        }
         // 🔥 Verificar si el llamado activo ya no existe
         if (llamadoActivo) {
           const pacienteConLlamado = data.pacientes.find(p => p.llamado === true);
@@ -19,7 +42,21 @@ function cargarPacientes() {
             llamadoActivo = null; // 🔥 Desbloquear
           }
         }
-        
+        if (!llamadoActivo) {
+          const pacienteConLlamado = data.pacientes.find(p => p.llamado === true);
+          if (pacienteConLlamado) llamadoActivo = pacienteConLlamado.id;
+        }
+
+        const nuevoKey = data.pacientes
+          .map(p => `${p.id}:${p.estado}:${p.llamado ? 1 : 0}`)
+          .join('|');
+
+        if (nuevoKey === lastPacientesKey) {
+          actualizarHora();
+          return;
+        }
+
+        lastPacientesKey = nuevoKey;
         pacientes = data.pacientes;
         renderizarTablero();
         actualizarEstadisticas();
@@ -32,13 +69,9 @@ function cargarPacientes() {
 
 // ========== RENDERIZAR TABLERO ==========
 function renderizarTablero() {
-  const preparacion = document.getElementById('lista-preparacion');
-  const quirofano = document.getElementById('lista-quirofano');
-  const recuperacion = document.getElementById('lista-recuperacion');
-
-  preparacion.innerHTML = '';
-  quirofano.innerHTML = '';
-  recuperacion.innerHTML = '';
+  const preparacion = DOM.listas.P;
+  const quirofano = DOM.listas.Q;
+  const recuperacion = DOM.listas.R;
 
   const porEstado = { P: [], Q: [], R: [] };
   pacientes.forEach(p => {
@@ -48,8 +81,6 @@ function renderizarTablero() {
   renderColumna(preparacion, porEstado.P, 'P');
   renderColumna(quirofano, porEstado.Q, 'Q');
   renderColumna(recuperacion, porEstado.R, 'R');
-
-  habilitarDropZones();
 }
 
 // ========== RENDERIZAR COLUMNA ==========
@@ -64,63 +95,57 @@ function renderColumna(contenedor, pacientes, estadoActual) {
     return;
   }
 
-  pacientes.forEach(p => {
-    const tarjeta = crearTarjetaPaciente(p, estadoActual);
-    contenedor.appendChild(tarjeta);
-  });
+  const html = pacientes.map(p => crearTarjetaPaciente(p, estadoActual)).join('');
+  contenedor.innerHTML = html;
 }
 
 // ========== CREAR TARJETA PACIENTE ==========
 function crearTarjetaPaciente(paciente, estadoActual) {
-  const tarjeta = document.createElement('div');
-  tarjeta.className = 'paciente-tarjeta';
-  tarjeta.dataset.id = paciente.id;
-  tarjeta.dataset.estado = estadoActual;
-  tarjeta.draggable = true;
-
   const esLlamadoActivo = paciente.llamado === true;
   const disabled = llamadoActivo && llamadoActivo !== paciente.id ? 'disabled' : '';
 
-  tarjeta.innerHTML = `
-    <div class="drag-handle">
-      <i class="fas fa-grip-vertical"></i>
-    </div>
-    <div class="paciente-contenido">
-      <div class="paciente-header">
-        <div class="paciente-id">
-          <i class="fas fa-id-card"></i>
-          <span>${paciente.id}</span>
-        </div>
-        <div class="acciones-paciente">
-          <div class="toggle-llamado-container">
-            <i class="fas fa-bell toggle-bell-icon"></i>
-            <label class="toggle-llamado ${disabled ? 'disabled' : ''}">
-              <input type="checkbox" 
-                     ${esLlamadoActivo ? 'checked' : ''} 
-                     ${disabled}
-                     onchange="toggleLlamado('${paciente.id}', this.checked)"
-                     id="toggle-${paciente.id}">
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-          <button class="btn-icon eliminar" 
-                  onclick="abrirModalEliminar('${paciente.id}', '${paciente.nombre}')" 
-                  title="Eliminar paciente">
-            <i class="fas fa-trash-alt"></i>
-          </button>
-        </div>
+  return `
+    <div class="paciente-tarjeta" data-id="${paciente.id}" data-estado="${estadoActual}" draggable="true">
+      <div class="drag-handle">
+        <i class="fas fa-grip-vertical"></i>
       </div>
-      <div class="paciente-nombre">
-        <i class="fas fa-user"></i>
-        ${paciente.nombre}
+      <div class="paciente-contenido">
+        <div class="paciente-header">
+          <div class="paciente-info">
+            <div class="paciente-id">
+              <i class="fas fa-id-card"></i>
+              <span>${paciente.id}</span>
+            </div>
+            <div class="paciente-nombre">
+              <i class="fas fa-user"></i>
+              ${paciente.nombre}
+            </div>
+          </div>
+          <div class="acciones-paciente">
+            <div class="toggle-llamado-container">
+              <i class="fas fa-bell toggle-bell-icon"></i>
+              <label class="toggle-llamado ${disabled ? 'disabled' : ''}">
+                <input type="checkbox"
+                       ${esLlamadoActivo ? 'checked' : ''}
+                       ${disabled}
+                       data-action="toggle-llamado"
+                       data-id="${paciente.id}"
+                       id="toggle-${paciente.id}">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <button class="btn-icon eliminar"
+                    data-action="eliminar"
+                    data-id="${paciente.id}"
+                    data-nombre="${paciente.nombre}"
+                    title="Eliminar paciente">
+              <i class="fas fa-trash-alt"></i>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   `;
-
-  tarjeta.addEventListener('dragstart', handleDragStart);
-  tarjeta.addEventListener('dragend', handleDragEnd);
-
-  return tarjeta;
 }
 
 // ========== TOGGLE LLAMADO (SIMPLIFICADO - SIN TIMERS) ==========
@@ -174,22 +199,31 @@ function toggleLlamado(identificacion, activar) {
 
 // ========== DRAG & DROP ==========
 function handleDragStart(e) {
-  elementoArrastrado = this;
-  this.classList.add('arrastrando');
+  const tarjeta = e.target.closest('.paciente-tarjeta');
+  if (!tarjeta) return;
+  elementoArrastrado = tarjeta;
+  dragInProgress = true;
+  tarjeta.classList.add('arrastrando');
   e.dataTransfer.effectAllowed = 'move';
-  e.dataTransfer.setData('text/html', this.innerHTML);
+  e.dataTransfer.setData('text/plain', tarjeta.dataset.id);
 }
 
 function handleDragEnd(e) {
-  this.classList.remove('arrastrando');
-  document.querySelectorAll('.lista-pacientes').forEach(lista => {
+  const tarjeta = e.target.closest('.paciente-tarjeta');
+  if (tarjeta) tarjeta.classList.remove('arrastrando');
+  dragInProgress = false;
+  Object.values(DOM.listas).forEach(lista => {
     lista.classList.remove('drag-over');
   });
+
+  if (pendingRefresh) {
+    pendingRefresh = false;
+    cargarPacientes();
+  }
 }
 
 function habilitarDropZones() {
-  const zonas = document.querySelectorAll('.lista-pacientes');
-  zonas.forEach(zona => {
+  Object.values(DOM.listas).forEach(zona => {
     zona.addEventListener('dragover', handleDragOver);
     zona.addEventListener('drop', handleDrop);
     zona.addEventListener('dragenter', handleDragEnter);
@@ -204,13 +238,13 @@ function handleDragOver(e) {
 }
 
 function handleDragEnter(e) {
+  if (e.relatedTarget && this.contains(e.relatedTarget)) return;
   this.classList.add('drag-over');
 }
 
 function handleDragLeave(e) {
-  if (e.target === this) {
-    this.classList.remove('drag-over');
-  }
+  if (e.relatedTarget && this.contains(e.relatedTarget)) return;
+  this.classList.remove('drag-over');
 }
 
 function handleDrop(e) {
@@ -221,10 +255,7 @@ function handleDrop(e) {
     const identificacion = elementoArrastrado.dataset.id;
     const estadoActual = elementoArrastrado.dataset.estado;
 
-    let nuevoEstado;
-    if (this.id === 'lista-preparacion') nuevoEstado = 'P';
-    else if (this.id === 'lista-quirofano') nuevoEstado = 'Q';
-    else if (this.id === 'lista-recuperacion') nuevoEstado = 'R';
+    const nuevoEstado = ESTADO_POR_LISTA[this.id];
 
     if (nuevoEstado && nuevoEstado !== estadoActual) {
       cambiarEstado(identificacion, nuevoEstado);
@@ -251,14 +282,12 @@ function actualizarEstadisticas() {
 }
 
 function actualizarContador(elementoId, tipoCard, estadoLetra, cantidad) {
-  const elemento = document.getElementById(elementoId);
-  const card = document.querySelector(`.stat-card.${tipoCard}`);
+  const elemento = DOM.stats[elementoId];
+  const card = DOM.stats[`${tipoCard}Card`];
+  if (!elemento || !card) return;
 
   elemento.textContent = cantidad;
   card.classList.remove('capacidad-excedida', 'capacidad-advertencia', 'capacidad-ok');
-
-  const tooltipPrevio = card.querySelector('.tooltip-capacidad');
-  if (tooltipPrevio) tooltipPrevio.remove();
 
   const validacion = CONFIG_TABLERO.validarCapacidad(estadoLetra, cantidad);
   
@@ -268,10 +297,13 @@ function actualizarContador(elementoId, tipoCard, estadoLetra, cantidad) {
     card.classList.add('capacidad-ok');
   }
 
-  const tooltip = document.createElement('div');
-  tooltip.className = 'tooltip-capacidad';
-  tooltip.innerHTML = validacion.mensaje;
-  card.appendChild(tooltip);
+  let tooltip = card.querySelector('.tooltip-capacidad');
+  if (!tooltip) {
+    tooltip = document.createElement('div');
+    tooltip.className = 'tooltip-capacidad';
+    card.appendChild(tooltip);
+  }
+  tooltip.textContent = validacion.mensaje;
 }
 
 // ========== CAMBIAR ESTADO ==========
@@ -407,44 +439,88 @@ function confirmarEliminar() {
 
 // ========== BÚSQUEDA ==========
 document.addEventListener('DOMContentLoaded', () => {
-  const buscarInput = document.getElementById('buscar-paciente');
-  if (buscarInput) {
-    buscarInput.addEventListener('input', (e) => {
-      const texto = e.target.value.toLowerCase();
-      document.querySelectorAll('.paciente-tarjeta').forEach(tarjeta => {
-        const nombre = tarjeta.querySelector('.paciente-nombre').textContent.toLowerCase();
-        const id = tarjeta.dataset.id.toLowerCase();
-        tarjeta.style.display = (nombre.includes(texto) || id.includes(texto)) ? 'block' : 'none';
-      });
+  DOM.listas = {
+    P: document.getElementById('lista-preparacion'),
+    Q: document.getElementById('lista-quirofano'),
+    R: document.getElementById('lista-recuperacion')
+  };
+  DOM.stats = {
+    'stat-preparacion': document.getElementById('stat-preparacion'),
+    'stat-quirofano': document.getElementById('stat-quirofano'),
+    'stat-recuperacion': document.getElementById('stat-recuperacion'),
+    'stat-total': document.getElementById('stat-total'),
+    preparacionCard: document.querySelector('.stat-card.preparacion'),
+    quirofanoCard: document.querySelector('.stat-card.quirofano'),
+    recuperacionCard: document.querySelector('.stat-card.recuperacion')
+  };
+  DOM.statsBar = document.querySelector('.stats-bar');
+  DOM.toggleStatsBtn = document.getElementById('toggle-stats');
+  DOM.buscarInput = document.getElementById('buscar-paciente');
+  DOM.buscarModalInput = document.getElementById('buscar-paciente-modal');
+  DOM.horaActualizacion = document.getElementById('hora-actualizacion');
+
+  habilitarDropZones();
+
+  const debouncedBuscar = debounce((texto) => {
+    document.querySelectorAll('.paciente-tarjeta').forEach(tarjeta => {
+      const nombre = tarjeta.querySelector('.paciente-nombre').textContent.toLowerCase();
+      const id = tarjeta.dataset.id.toLowerCase();
+      tarjeta.classList.toggle('is-hidden', !(nombre.includes(texto) || id.includes(texto)));
+    });
+  }, 120);
+
+  if (DOM.buscarInput) {
+    DOM.buscarInput.addEventListener('input', (e) => {
+      debouncedBuscar(e.target.value.toLowerCase());
     });
   }
 
   // Toggle barra de estadísticas para ganar espacio en tabletas
-  const toggleStatsBtn = document.getElementById('toggle-stats');
-  const statsBar = document.querySelector('.stats-bar');
-  if (toggleStatsBtn && statsBar) {
-    toggleStatsBtn.addEventListener('click', () => {
-      const hidden = statsBar.classList.toggle('stats-hidden');
-      toggleStatsBtn.setAttribute('aria-pressed', hidden ? 'true' : 'false');
-      const label = toggleStatsBtn.querySelector('.btn-label');
+  if (DOM.toggleStatsBtn && DOM.statsBar) {
+    DOM.toggleStatsBtn.addEventListener('click', () => {
+      const hidden = DOM.statsBar.classList.toggle('stats-hidden');
+      DOM.toggleStatsBtn.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+      const label = DOM.toggleStatsBtn.querySelector('.btn-label');
       if (label) label.textContent = hidden ? 'Mostrar barra' : 'Ocultar barra';
     });
   }
 
-  const buscarModalInput = document.getElementById('buscar-paciente-modal');
-  if (buscarModalInput) {
-    buscarModalInput.addEventListener('input', (e) => {
-      const texto = e.target.value.toLowerCase();
+  if (DOM.buscarModalInput) {
+    const debouncedModal = debounce((texto) => {
       document.querySelectorAll('.paciente-disponible').forEach(item => {
         const nombre = item.querySelector('.paciente-disponible-nombre').textContent.toLowerCase();
         const id = item.querySelector('.paciente-disponible-id').textContent.toLowerCase();
-        item.style.display = (nombre.includes(texto) || id.includes(texto)) ? 'block' : 'none';
+        item.classList.toggle('is-hidden', !(nombre.includes(texto) || id.includes(texto)));
       });
+    }, 120);
+    DOM.buscarModalInput.addEventListener('input', (e) => {
+      debouncedModal(e.target.value.toLowerCase());
     });
   }
 
+  document.addEventListener('dragstart', handleDragStart);
+  document.addEventListener('dragend', handleDragEnd);
+
+  document.addEventListener('change', (e) => {
+    const target = e.target;
+    if (!target || target.dataset.action !== 'toggle-llamado') return;
+    toggleLlamado(target.dataset.id, target.checked);
+  });
+
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action="eliminar"]');
+    if (!btn) return;
+    abrirModalEliminar(btn.dataset.id, btn.dataset.nombre);
+  });
+
   cargarPacientes();
-  setInterval(cargarPacientes, CONFIG_TABLERO.INTERVALO_ACTUALIZACION);
+  setInterval(() => {
+    if (dragInProgress) {
+      pendingRefresh = true;
+      return;
+    }
+    cargarPacientes();
+  }, CONFIG_TABLERO.INTERVALO_ACTUALIZACION);
 });
 
 // ========== NOTIFICACIONES ==========
@@ -477,8 +553,15 @@ function actualizarHora() {
     minute: '2-digit',
     second: '2-digit'
   });
-  const horaElement = document.getElementById('hora-actualizacion');
-  if (horaElement) horaElement.textContent = hora;
+  if (DOM.horaActualizacion) DOM.horaActualizacion.textContent = hora;
+}
+
+function debounce(fn, wait) {
+  let t = null;
+  return (...args) => {
+    if (t) clearTimeout(t);
+    t = setTimeout(() => fn(...args), wait);
+  };
 }
 
 

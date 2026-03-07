@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Censo</title>
+  <title>Censo Hospitalario - Dashboard</title>
 
   <!-- Bootstrap -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-  <!-- ECharts (en vez de Chart.js) -->
+  <!-- ECharts -->
   <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
 
   <!-- CSS propio -->
@@ -17,86 +17,230 @@
 </head>
 <body>
 
-  <!-- Barra superior -->
-  <div class="topbar" id="topbar">
-    <form id="formulario-censo" class="row w-100 m-0 p-2 align-items-center">
-      <!-- Selector de Servicio -->
-      <div class="col-md-4">
-        <select name="servicio" id="servicio" class="form-select" required>
-          <option value="">Seleccione un servicio</option>
-          {% for s in servicios %}
-            <option value="{{ s.ubicod }}">{{ s.ubicod }} - {{ s.ubinom }}</option>
-          {% endfor %}
-        </select>
+  <!-- Contenedor principal del Dashboard -->
+  <div class="container-fluid dashboard-container">
+    
+    <!-- Bloque de Segmentación: Filtros integrados (SIEMPRE VISIBLE) -->
+    <div class="segmentation-block">
+      <div class="row g-3 align-items-center" style="padding: 4px;">
+        <!-- Selector de Servicio -->
+        <div class="col-lg-2 col-md-6">
+          <select name="servicio" id="servicio" class="form-select" required>
+            <option value="">🏥 Servicio</option>
+            {% for s in servicios %}
+              <option value="{{ s.ubicod }}">{{ s.ubicod }} - {{ s.ubinom }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Selector de Empresa (Expandido) -->
+        <div class="col-lg-4 col-md-6">
+          <select name="empresa" id="empresa" class="form-select" disabled>
+            <option value="">🏢 Empresa</option>
+          </select>
+        </div>
+
+        <!-- Botón Análisis Adicionales -->
+        <div class="col-lg-auto col-md-6">
+          <button type="button" class="btn btn-info w-100" id="btnAnalisisAdicionales">
+            <i class="fas fa-chart-line"></i> <span class="ms-1">Análisis</span>
+          </button>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="col-lg-auto col-md-6 d-flex gap-2">
+          <button type="button" class="btn btn-success" id="btnDescargarExcel" title="Descargar reporte en Excel">
+            <i class="fas fa-download"></i> <span class="ms-1 d-none d-lg-inline">Descargar</span>
+          </button>
+          <button type="button" class="btn btn-secondary" id="btnRefrescarManual" title="Actualizar datos">
+            <i class="fas fa-redo-alt"></i>
+          </button>
+        </div>
       </div>
+    </div>
+    
+    <!-- Mensaje de placeholder -->
+    <div id="mensaje-placeholder" class="placeholder-message">
+      <i class="fas fa-inbox"></i>
+      <p>Seleccione un servicio para visualizar el dashboard</p>
+    </div>
 
-      <!-- Selector de Empresa -->
-      <div class="col-md-4 mt-3 mt-md-0">
-        <select name="empresa" id="empresa" class="form-select" disabled>
-          <option value="">Seleccione primero un servicio</option>
-        </select>
-      </div>
+    <!-- VISTA PRINCIPAL: Tablero Principal (Layout Horizontal Optimizado) -->
+    <div id="main-dashboard" style="display: none;">
 
-      <!-- Botón Excel -->
-      <div class="col-md-4 mt-3 mt-md-0 d-flex align-items-center">
-        <button type="button" class="btn btn-light w-50" id="btnDescargarExcel">
-          <i class="fas fa-file-excel text-success"></i> Descargar Excel
-        </button>
-      </div>
-    </form>
-  </div>
+      <!-- Contenedor principal unificado -->
+      <div class="dashboard-main-container">
 
-  <!-- Botón hamburguesa -->
-  <div class="hamburger-btn visible" id="toggleBtn">
-    <div></div>
-    <div></div>
-    <div></div>
-  </div>
+        <!-- Título del Dashboard + Última actualización -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <h1 class="dashboard-title" style="margin-bottom: 0; flex: 1;">CENSO HOSPITALARIO</h1>
+          <div id="ultima-actualizacion" style="text-align: right;">
+            <span id="texto-actualizacion" style="font-size: 0.85rem; color: #666;">Última actualización: --</span>
+            <i id="icono-refresh" class="fas fa-sync-alt text-primary" style="display:none; margin-left: 6px;"></i>
+          </div>
+        </div>
 
-  <!-- Título -->
-  <h2 id="tituloCenso" class="text-center mb-0">Censo de Camas por Ubicación</h2>
-  <div id="empresaSeleccionada" class="text-center empresa-seleccionada"></div>
+        <!-- Fila 1: KPI Cards (4 en 1 fila) -->
+        <div id="kpi-section" class="kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <div class="kpi-header"><i class="fas fa-bed"></i></div>
+              <div class="kpi-label">Camas Ocupadas</div>
+            </div>
+            <div class="kpi-value" id="kpi-ocupadas">0</div>
+            <div class="kpi-footer">Total ocupadas</div>
+          </div>
 
-  <!-- Contenedor principal -->
-  <div class="container-fluid mt-4">
-    <div class="card censo-card shadow-sm">
-      <div class="card-body p-3">
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <div class="kpi-header"><i class="fas fa-door-open"></i></div>
+              <div class="kpi-label">Camas Disponibles</div>
+            </div>
+            <div class="kpi-value" id="kpi-disponibles">0</div>
+            <div class="kpi-footer">Libres para uso</div>
+          </div>
 
-        <div class="row">
-          <!-- Gráfico -->
-          <div class="col-md-9">
-            <div class="chart-container position-relative" style="min-height: 450px;">
-              <!-- 🔹 Ahora es un DIV para ECharts -->
-              <div id="graficoCenso" class="w-100 h-100" style="min-height:450px;"></div>
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <div class="kpi-header"><i class="fas fa-chart-pie"></i></div>
+              <div class="kpi-label">Ocupación</div>
+            </div>
+            <div class="kpi-value" id="kpi-ocupacion">0%</div>
+            <div class="kpi-footer">Porcentaje del servicio</div>
+          </div>
 
-              <!-- Placeholder -->
-              <div id="mensaje-placeholder"
-                   class="text-muted text-center position-absolute top-50 start-50 translate-middle">
-                Seleccione un servicio para visualizar el gráfico.
-              </div>
+          <div class="kpi-card" id="kpi-estancia-card">
+            <div class="kpi-top">
+              <div class="kpi-header"><i class="fas fa-calendar-days"></i></div>
+              <div class="kpi-label">Estancia Promedio</div>
+              <div class="semaphore-indicator" id="semaphore-estancia"></div>
+            </div>
+            <div class="kpi-value" id="kpi-estancia">0 días</div>
+            <div class="kpi-footer">Permanencia promedio</div>
+          </div>
+        </div>
+
+        <!-- Fila 2: Gráfico (Contenido horizontal) -->
+        <div id="charts-section" class="charts-section">
+          <div class="chart-card">
+            <div class="chart-header">
+              <h5><i class="fas fa-bars"></i> Disponibilidad por Servicio</h5>
+              <span class="chart-badge">Ocupadas, Disponibles, Total y % Ocupación</span>
+            </div>
+            <div class="grafico-contenedor">
+              <div id="graficoBarras" class="main-chart"></div>
             </div>
           </div>
-          <!-- Interpretación -->
-          <div class="col-md-3 d-flex flex-column">
-            <div id="interpretacionGrafica" class="border rounded p-3 bg-light flex-grow-1"></div>
+        </div>
+
+        <!-- Fila 3: Tabla Detallada de Servicios -->
+        <div class="servicios-section">
+          <div class="servicios-card">
+            <div class="servicios-header">
+              <h5><i class="fas fa-table"></i> Detalle por Servicio</h5>
+            </div>
+            <div class="servicios-tabla-wrapper">
+              <table class="servicios-tabla">
+                <thead>
+                  <tr>
+                    <th>Servicio</th>
+                    <th class="text-center">Ocupadas</th>
+                    <th class="text-center">Disponibles</th>
+                    <th class="text-center">Total</th>
+                    <th class="text-center">% Ocupación Serv</th>
+                    <th class="text-center">% Ocupación Gral</th>
+                    <th class="text-center">Estancia (días)</th>
+                  </tr>
+                </thead>
+                <tbody id="servicios-detalle">
+                  <!-- Se generarán dinámicamente con JavaScript -->
+                </tbody>
+              </table>
+            </div>
           </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- MODAL DE REPORTES -->
+  <div class="modal fade" id="reportsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-fullscreen-lg-down modal-lg">
+      <div class="modal-content">
+        
+        <!-- Header del Modal -->
+        <div class="modal-header reports-modal-header">
+          <h5 class="modal-title" id="modalReportTitle">
+            <i class="fas fa-chart-bar"></i> Tablero Principal
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+
+        <!-- Body del Modal -->
+        <div class="modal-body reports-modal-body">
+          
+          <!-- Pestañas internas del modal -->
+          <div class="modal-tabs">
+            <button class="modal-tab-btn active" data-modal-tab="1" title="Promedio de Estancia">
+              <i class="fas fa-clock"></i> Estancia
+            </button>
+            <button class="modal-tab-btn" data-modal-tab="2" title="Análisis de Asegurador">
+              <i class="fas fa-shield"></i> Asegurador
+            </button>
+            <button class="modal-tab-btn" data-modal-tab="3" title="Distribución por Edad">
+              <i class="fas fa-birthday-cake"></i> Edad
+            </button>
+          </div>
+
+          <!-- Contenido de pestañas del modal -->
+          
+          <!-- Placeholder cuando no hay datos -->
+          <div id="modal-placeholder" class="modal-placeholder">
+            <div class="placeholder-content">
+              <i class="fas fa-info-circle"></i>
+              <h6>Selecciona una opción</h6>
+              <p>Por favor selecciona un servicio o empresa para ver los análisis adicionales.</p>
+            </div>
+          </div>
+          
+          <!-- Tab 1: Estancia -->
+          <div class="modal-tab-content active" data-modal-tab="1">
+            <div class="modal-slide-title">
+              <h5><i class="fas fa-clock"></i> Promedio de Estancia por Servicio</h5>
+              <p class="text-muted">Análisis detallado de permanencia</p>
+            </div>
+            <div id="graficoEstancia" class="modal-chart"></div>
+          </div>
+
+          <!-- Tab 2: Asegurador -->
+          <div class="modal-tab-content" data-modal-tab="2">
+            <div class="modal-slide-title">
+              <h5><i class="fas fa-shield"></i> Análisis de Asegurador</h5>
+              <p class="text-muted">Pacientes por tipo de asegurador</p>
+            </div>
+            <div id="graficoAsegurador" class="modal-chart"></div>
+          </div>
+
+          <!-- Tab 3: Edad -->
+          <div class="modal-tab-content" data-modal-tab="3">
+            <div class="modal-slide-title">
+              <h5><i class="fas fa-birthday-cake"></i> Distribución por Rango de Edad</h5>
+              <p class="text-muted">Pacientes hospitalizados por grupo de edad</p>
+            </div>
+            <div id="graficoRangoEdad" class="modal-chart"></div>
+          </div>
+
         </div>
 
       </div>
     </div>
   </div>
 
-  <!-- Script principal -->
-  <script src="{{ url_for('static', filename='hospitalizacion/js/censo.js') }}"></script>
-
-  <!-- Bootstrap Bundle -->
+  <!-- Scripts -->
+  <script src="{{ url_for('static', filename='hospitalizacion/js/censo_new.js') }}"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-  <!-- Última actualización -->
-  <div id="ultima-actualizacion" 
-       class="position-fixed bottom-0 start-0 m-2 fs-6 fw-bold bg-white bg-opacity-90 px-3 py-2 rounded shadow d-flex align-items-center gap-2">
-    <span id="texto-actualizacion">Última actualización: --</span>
-    <i id="icono-refresh" class="fas fa-sync-alt text-primary" style="display:none;"></i>
-  </div>
 </body>
 </html>

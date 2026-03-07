@@ -54,24 +54,24 @@ def estadisticas():
 
             # Diccionario con nombre de hoja y tabla
             tablas = {
-                'POR TIPO ANESTESIA': "CIRTIPANE",
-                'POR EDAD': "CIREDAD",
-                'POR EMPRESA': "CIREMPR",
-                'POR RESPONSABLE': "CIRRESP",
-                'POR ESPECIALIDAD': "CIRESPC",
-                'POR MEDICO': "CIRMEDIC",
-                'POR DURACION': "CIRDURA",
-                'DETALLADO': "CIRDETA",
-                '10 MAS COMUNES': "CIRMASCO",
-                'POR TIEMPO ESPERA': "CIRPROG",
-                'POR TIPO': "CIRTIPO",
-                'RESUMEN': "RESUMEN",
-                'POR REINTERVENCION': "REINTER",
-                'POR COMPLICACION': "CIRCOMPLICA",
-                'OPORTUNIDAD ATENCION': "CIRDATFIN",
-                'TIEMPO PROMEDIO PROCE': "PROCED1",
-                'CIRUGIAS TOTALES': "NOPROCED",
-                'AMBULATORIA Y HOSPITALIZADA': "TIPAC1",
+                 #'POR TIPO ANESTESIA': "CIRTIPANE",
+                 #'POR EDAD': "CIREDAD",
+                 #'POR EMPRESA': "CIREMPR",
+                 #'POR RESPONSABLE': "CIRRESP",
+                 #'POR ESPECIALIDAD': "CIRESPC",
+                 #'POR MEDICO': "CIRMEDIC",
+                 #'POR DURACION': "CIRDURA",
+                 #'DETALLADO': "CIRDETA",
+                 #'10 MAS COMUNES': "CIRMASCO",
+                 #'POR TIEMPO ESPERA': "CIRPROG",
+                 #'POR TIPO': "CIRTIPO",
+                 #'RESUMEN': "RESUMEN",
+                 #'POR REINTERVENCION': "REINTER",
+                 #'POR COMPLICACION': "CIRCOMPLICA",
+                 #'OPORTUNIDAD ATENCION': "CIRDATFIN",
+                 #'TIEMPO PROMEDIO PROCE': "PROCED1",
+                 #'CIRUGIAS TOTALES': "NOPROCED",
+                 #'AMBULATORIA Y HOSPITALIZADA': "TIPAC1",
                 'PROFILAXIS ANTIBIOTICA': "PROFIX1",
             }
 
@@ -92,7 +92,6 @@ def estadisticas():
                             ajustar_columnas(writer, nombre_hoja[:31], df)
                             
                     except Exception as e:
-                        print(f"⚠️ Error con tabla {tabla}: {e}")
                         continue
 
         if r and logs_key:
@@ -161,8 +160,9 @@ def ajustar_columnas(writer, sheet_name, df):
 
 def procesar_xml_profix(df):
     """
-    Extrae el valor (SI/NO/NA) del item 'Administración de profilaxis antibiotica'
-    de la columna VARCLIDES que contiene el XML y omite filas sin valor válido
+    Extrae el valor (SI/NO/NA) y las observaciones (OBS) del item 
+    'Administración de profilaxis antibiotica' de la columna VARCLIDES 
+    que contiene el XML y omite filas sin valor válido
     """
     import xml.etree.ElementTree as ET
     import pandas as pd
@@ -175,16 +175,16 @@ def procesar_xml_profix(df):
             break
     
     if varclides_col is None:
-        print(f"⚠️ No se encontró la columna VARCLIDES")
         return df
     
-    def extraer_profilaxis_antibiotica(xml_string):
+    def extraer_profilaxis_datos(xml_string):
         """
         Busca el Row con ITEM='Administración de profilaxis antibiotica'
-        y extrae su valor (SI/NO/NA)
+        y extrae su valor (SI/NO/NA) y sus observaciones (OBS).
+        Retorna una tupla (valor, observacion)
         """
         if pd.isna(xml_string) or not xml_string or str(xml_string).strip() == '':
-            return None
+            return (None, None)
         
         try:
             xml_str = str(xml_string).strip()
@@ -192,45 +192,64 @@ def procesar_xml_profix(df):
             
             # Recorrer todos los Row del XML
             for row in root.findall('.//Row'):
-                item_cell = row.find('./'
-                '/Cell[@ColumnCode="ITEM"]')
+                item_cell = row.find('.//Cell[@ColumnCode="ITEM"]')
                 
                 if item_cell is not None:
                     item_value = item_cell.find('Value')
                     
+                    # Si encontramos el item correcto
                     if item_value is not None and 'profilaxis antibiotica' in item_value.text.lower():
+                        valor_profilaxis = None
+                        observacion = None
+                        
+                        # Buscar todas las celdas del mismo Row
                         for cell in row.findall('.//Cell'):
                             column_code = cell.get('ColumnCode')
-                            if column_code in ['SI', 'NO', 'NA']:
-                                value_elem = cell.find('Value')
-                                if value_elem is not None:
-                                    valor = value_elem.text
-                                    if valor == 'S':
-                                        return 'SI'
-                                    elif valor == 'N':
-                                        return 'NO'
-                                    elif valor == 'NA':
-                                        return 'NA'
-                                    else:
-                                        return valor
-            return None
+                            value_elem = cell.find('Value')
+                            
+                            # Extraer el valor SI/NO/NA
+                            if column_code in ['SI', 'NO', 'NA'] and value_elem is not None:
+                                valor = value_elem.text
+                                if valor == 'S':
+                                    valor_profilaxis = 'SI'
+                                elif valor == 'N':
+                                    valor_profilaxis = 'NO'
+                                elif valor == 'NA':
+                                    valor_profilaxis = 'NA'
+                                else:
+                                    valor_profilaxis = valor
+                            
+                            # Extraer las observaciones
+                            if column_code == 'OBS' and value_elem is not None:
+                                observacion = value_elem.text if value_elem.text else ''
+                        
+                        return (valor_profilaxis, observacion)
+            
+            return (None, None)
+            
         except Exception as e:
-            print(f"⚠️ Error parseando XML: {e}")
-            return None
+            return (None, None)
     
     # Crear copia y extraer valores
     df_result = df.copy()
-    df_result['Profilaxis_Antibiotica'] = df_result[varclides_col].apply(extraer_profilaxis_antibiotica)
     
-    # Filtrar filas sin valor válido
+    # Aplicar la función y separar los resultados en dos columnas
+    datos_extraidos = df_result[varclides_col].apply(extraer_profilaxis_datos)
+    df_result['Profilaxis_Antibiotica'] = datos_extraidos.apply(lambda x: x[0])
+    df_result['Observaciones_Profilaxis'] = datos_extraidos.apply(lambda x: x[1])
+    
+    # Filtrar filas sin valor válido en Profilaxis_Antibiotica
     df_result = df_result[df_result['Profilaxis_Antibiotica'].notna()]
     
     # Eliminar columna VARCLIDES
     if varclides_col in df_result.columns:
         df_result = df_result.drop(columns=[varclides_col])
     
-    print(f"✅ Procesados {len(df_result)} registros con profilaxis antibiótica")
+    # Estadísticas de procesamiento
+    total_procesados = len(df_result)
+    con_observaciones = df_result['Observaciones_Profilaxis'].notna().sum()
     
+
     return df_result
 
 

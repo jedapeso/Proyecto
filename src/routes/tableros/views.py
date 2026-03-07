@@ -98,9 +98,6 @@ def obtener_datos_uci():
         return jsonify(response_data)
 
     except Exception as e:
-        import traceback
-        print("❌ Error en obtener_datos_uci:")
-        traceback.print_exc()
         return jsonify({"error": f"Error al ejecutar SP_Escalas_Ucid: {str(e)}"}), 500
     
 #---------------------------------------------------------
@@ -137,9 +134,6 @@ def convertir_a_lenguaje_natural(texto):
         response = model.generate_content(prompt)
         return response.text.strip() if response and response.text else "Sin información generada"
     except Exception as e:
-        import traceback
-        print(f"⚠️ Error al invocar el modelo: {e}")
-        traceback.print_exc()
         return "Error al procesar la información (verifique el log del servidor para más detalles)."
 
 @tableros_bp.route('/uci/riesgos-necesidades-detalle', methods=['POST'])
@@ -200,5 +194,4 @@ def obtener_riesgos_necesidades():
         })
 
     except Exception as e:
-        traceback.print_exc()
         return jsonify({"error": f"Error al obtener riesgos: {str(e)}"}), 500

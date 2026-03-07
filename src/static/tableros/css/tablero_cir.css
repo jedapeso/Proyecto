@@ -304,19 +304,21 @@ body {
     padding: 4px;
     flex: 1;
     overflow-y: auto;
+    contain: layout paint;
 }
 
 /* ========== TARJETAS DE PACIENTES ========== */
 .paciente-tarjeta {
     background: var(--bg-light);
-    border-radius: 12px;
-    padding: 4px;
-    margin-bottom: 12px;
+    border-radius: 8px;
+    padding: 6px;
+    margin-bottom: 8px;
     transition: all 0.3s;
     border: 2px solid transparent;
     cursor: move;
     user-select: none;
     position: relative;
+    will-change: transform;
 }
 
 .paciente-tarjeta:hover {
@@ -328,6 +330,10 @@ body {
 .paciente-tarjeta.arrastrando {
     opacity: 0.5;
     transform: rotate(5deg);
+}
+
+.is-hidden {
+    display: none !important;
 }
 
 /* ========== DRAG HANDLE ========== */
@@ -354,26 +360,39 @@ body {
 }
 
 .paciente-contenido {
-    padding-left: 8px;
+    padding-left: 6px;
 }
 
 .paciente-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 10px;
+    gap: 8px;
+    margin-bottom: 0;
+}
+
+.paciente-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
 }
 
 .paciente-id {
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    color: var(--text-light);
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-dark);
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .paciente-id i {
     color: var(--color-primary);
+    font-size: 13px;
 }
 
 /* ========== ACCIONES CON TOGGLE SWITCH MEJORADO ========== */
@@ -526,18 +545,23 @@ body {
 }
 
 .paciente-nombre {
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
     color: var(--text-dark);
-    margin-bottom: 10px;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .paciente-nombre i {
     color: var(--color-primary);
-    font-size: 14px;
+    font-size: 13px;
+    flex-shrink: 0;
 }
 
 /* ========== DRAG & DROP ZONES ========== */
@@ -1014,6 +1038,122 @@ body {
 
     .toggle-bell-icon {
         font-size: 14px;
+    }
+}
+
+/* ===== MEDIA QUERIES RESPONSIVAS ===== */
+
+/* Pantallas 1920x1080 (TV) - OPTIMIZADO */
+@media (min-width: 1920px) and (max-height: 1080px) {
+    .main-content {
+        padding: 15px 20px;
+    }
+    .tablero-grid {
+        gap: 15px;
+    }
+    .columna-estado {
+        min-height: 900px;
+    }
+    .paciente-tarjeta {
+        padding: 5px;
+        margin-bottom: 6px;
+    }
+    .paciente-id {
+        font-size: 13px;
+    }
+    .paciente-nombre {
+        font-size: 15px;
+    }
+}
+
+/* Pantallas 1200-1919px */
+@media (min-width: 1200px) and (max-width: 1919px) {
+    .main-content {
+        padding: 20px 25px;
+    }
+    .tablero-grid {
+        gap: 20px;
+    }
+    .columna-estado {
+        min-height: 700px;
+    }
+    .paciente-tarjeta {
+        padding: 6px;
+        margin-bottom: 8px;
+    }
+}
+
+/* Pantallas Tablet 768px - 1199px */
+@media (min-width: 768px) and (max-width: 1199px) {
+    .tablero-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+    }
+    .main-content {
+        padding: 15px 20px;
+    }
+    .columna-estado {
+        min-height: 500px;
+    }
+    .paciente-tarjeta {
+        padding: 5px;
+        margin-bottom: 6px;
+    }
+    .acciones-paciente {
+        gap: 8px;
+    }
+    .toggle-llamado {
+        width: 36px;
+        height: 20px;
+    }
+    .toggle-slider::before {
+        height: 14px;
+        width: 14px;
+        left: 2px;
+        bottom: 3px;
+    }
+    .toggle-llamado input:checked + .toggle-slider::before {
+        transform: translateX(16px);
+    }
+    .btn-icon.eliminar {
+        width: 28px;
+        height: 28px;
+        font-size: 12px;
+    }
+}
+
+/* Pantallas pequeñas < 768px */
+@media (max-width: 767px) {
+    .tablero-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    .main-content {
+        padding: 12px 15px;
+    }
+    .columna-estado {
+        min-height: 400px;
+    }
+    .paciente-tarjeta {
+        padding: 4px;
+        margin-bottom: 5px;
+    }
+    .paciente-info {
+        gap: 6px;
+    }
+    .paciente-id {
+        font-size: 11px;
+    }
+    .paciente-nombre {
+        font-size: 12px;
+    }
+    .acciones-paciente {
+        gap: 6px;
+    }
+    .btn-icon.eliminar {
+        width: 24px;
+        height: 24px;
+        font-size: 11px;
     }
 }
 

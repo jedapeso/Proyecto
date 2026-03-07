@@ -3,8 +3,6 @@ document.addEventListener("DOMContentLoaded", () => {
   /* =======================================================
      === Referencias a elementos del DOM ===
   ======================================================= */
-  const toggleBtn = document.getElementById("toggleBtn");
-  const topbar = document.getElementById("topbar");
   const selectServicio = document.getElementById("servicio");
   const selectEmpresa = document.getElementById("empresa");
   const canvas = document.getElementById("graficoCenso"); // contenedor DIV para ECharts
@@ -41,61 +39,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (chart) chart.resize();
   }
   window.addEventListener("resize", ajustarCanvas);
-
-  /* =======================================================
-     === Botón flotante de refresco ===
-  ======================================================= */
-  const btnRefrescar = document.createElement("button");
-  btnRefrescar.id = "btnRefrescar";
-  btnRefrescar.innerHTML = "⟳"; // símbolo simple de refresco
-  btnRefrescar.title = "Refrescar gráfico";
-  btnRefrescar.style.cssText = `
-    position: fixed; top: 120px; right: 10px;
-    width: 50px; height: 50px;
-    border-radius: 50%; border: none;
-    background-color: #3498db; color: #fff;
-    font-size: 24px; cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-    opacity: 0; transform: scale(0.5);
-    transition: opacity 0.4s ease, transform 0.25s ease;
-    z-index: 1000;
-  `;
-  document.body.appendChild(btnRefrescar);
-
-  function mostrarBoton() {
-    btnRefrescar.style.opacity = "1";
-    btnRefrescar.style.transform = "scale(1)";
-  }
-  function ocultarBoton() {
-    btnRefrescar.style.opacity = "0";
-    btnRefrescar.style.transform = "scale(0.5)";
-  }
-  function actualizarBotonRefresco() {
-    if (!topbar) return;
-    topbar.style.transform === "translateY(-100%)"
-      ? mostrarBoton()
-      : ocultarBoton();
-  }
-  btnRefrescar.addEventListener("click", async () => {
-    await performUpdateWithIcon(true);
-  });
-
-  /* =======================================================
-     === Toggle topbar ===
-  ======================================================= */
-  if (toggleBtn && topbar) {
-    toggleBtn.addEventListener("click", () => {
-      if (topbar.style.transform === "translateY(-100%)") {
-        topbar.style.transform = "translateY(0)";
-        toggleBtn.classList.remove("open");
-      } else {
-        topbar.style.transform = "translateY(-100%)";
-        toggleBtn.classList.add("open");
-      }
-      actualizarBotonRefresco();
-    });
-  }
-  actualizarBotonRefresco();
 
   /* =======================================================
      === Cargar empresas según servicio ===

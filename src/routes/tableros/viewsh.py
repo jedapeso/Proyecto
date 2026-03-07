@@ -83,8 +83,6 @@ def obtener_datos_hos():
         return jsonify(response_data)
 
     except Exception as e:
-        print("❌ Error en obtener_datos_hos:")
-        traceback.print_exc()
         return jsonify({"error": f"Error al ejecutar SP_Escalas_hosd: {str(e)}"}), 500
 
 # --------------------------------------------
@@ -117,7 +115,6 @@ def convertir_a_lenguaje_natural_hos(texto):
         response = model.generate_content(prompt)
         return response.text.strip() if response and response.text else "Sin información generada"
     except Exception as e:
-        traceback.print_exc()
         return "Error al procesar la información (verifique el log del servidor)."
 
 
@@ -179,5 +176,4 @@ def obtener_riesgos_necesidades_hos():
         })
 
     except Exception as e:
-        traceback.print_exc()
         return jsonify({"error": f"Error al obtener riesgos: {str(e)}"}), 500

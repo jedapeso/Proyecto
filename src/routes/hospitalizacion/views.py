@@ -75,6 +75,73 @@ def get_empresas():
         {"id": e[0], "nombre": e[1]} for e in empresas
 ])
 
+
+@hospitalizacion_bp.route('/servicios_por_empresa', methods=['POST'])
+def servicios_por_empresa():
+    """
+    Dado un EMPNIT, ejecuta SP_Censod('TS', empresa) para poblar CENSO1
+    con todos los pisos filtrados por esa empresa, y devuelve qué UBIs
+    tienen pacientes (OCUPADAS > 0).
+    Si empresa='0' o vacío devuelve todos los servicios.
+    """
+    data = request.get_json()
+    empresa = (data.get("empresa") or "").strip()
+
+    if not empresa or empresa == "0":
+        # Sin filtro de empresa → todos los servicios disponibles
+        with engine.connect() as conn:
+            conn.execute(text("EXECUTE PROCEDURE SP_UbicaCensod()"))
+            servicios = conn.execute(
+                text("SELECT UBICOD, UBINOM FROM UBICAH1")
+            ).fetchall()
+        return jsonify([{"ubi": s[0], "nombre": s[1]} for s in servicios])
+
+    try:
+        with engine.connect() as conn:
+            # Poblar CENSO1 para todos los servicios con esta empresa
+            conn.execute(
+                text("EXECUTE PROCEDURE SP_Censod(:servicio, :empresa)"),
+                {"servicio": "TS", "empresa": empresa}
+            )
+            # Contar filas de pacientes por UBI (no usar OCUPADAS que refleja total de camas)
+            rows = conn.execute(text("""
+                SELECT UBI, COUNT(*) AS CNT
+                FROM CENSO1
+                WHERE UBI <> 'TS'
+                  AND ASEGURADOR IS NOT NULL
+                  AND TRIM(ASEGURADOR) <> ''
+                GROUP BY UBI
+                HAVING COUNT(*) > 0
+                ORDER BY
+                    CASE
+                        WHEN UBI='H1' THEN 1
+                        WHEN UBI='H2' THEN 2
+                        WHEN UBI='H3' THEN 3
+                        WHEN UBI='UA' THEN 4
+                        ELSE 9
+                    END
+            """)).fetchall()
+
+        nombres = {
+            "H1": "Hospitalización Piso 1",
+            "H2": "Hospitalización Piso 2",
+            "H3": "Hospitalización Piso 3",
+            "UA": "UCI"
+        }
+        servicios_activos = [
+            {"ubi": r[0].strip(), "nombre": nombres.get(r[0].strip(), r[0].strip())}
+            for r in rows
+        ]
+
+        # Si hay más de un servicio activo, agregar TS al inicio para ver todos
+        if len(servicios_activos) > 1:
+            servicios_activos.insert(0, {"ubi": "TS", "nombre": "Todos los servicios"})
+
+        return jsonify(servicios_activos)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @hospitalizacion_bp.route('/reporte_censo', methods=['POST'])
 def reporte_censo():
     servicio = request.form.get('servicio')
@@ -110,7 +177,7 @@ def reporte_censo():
                     DIAGNOSTICO
             FROM 
             CENSO1 
-            WHERE H <> 'TS' ORDER BY SERVICIO,HABITACION
+            WHERE UBI <> 'TS' ORDER BY SERVICIO,HABITACION
         """, conn)
 
         # Resumen desde tabla CENSO1 
@@ -169,6 +236,11 @@ def reporte_censo():
         # Formatos
         formato_gris = workbook.add_format({'bg_color': '#f2f2f2'})
         formato_negrita = workbook.add_format({'bold': True})
+        formato_porcentaje = workbook.add_format({'num_format': '0.00'})
+        formato_verde = workbook.add_format({'bg_color': "#2ecc71"})
+        formato_dorado = workbook.add_format({'bg_color': "#FFFF00"})
+        formato_violeta = workbook.add_format({'bg_color': "#e67e22"})
+        formato_rojo = workbook.add_format({'bg_color': "#ff0000"})
 
         # Alternar color por servicio en hoja de detalle
         last_service = None
@@ -190,13 +262,6 @@ def reporte_censo():
         if not df_estancia.empty:
             df_estancia.to_excel(writer, index=False, sheet_name='Resumen DATO1')
             ws_resumen = writer.sheets['Resumen DATO1']
-
-            # Formatos adicionales
-            formato_porcentaje = workbook.add_format({'num_format': '0.00'})
-            formato_verde = workbook.add_format({'bg_color': "#2ecc71"})
-            formato_dorado = workbook.add_format({'bg_color': "#FFFF00"})
-            formato_violeta = workbook.add_format({'bg_color': "#e67e22"})
-            formato_rojo = workbook.add_format({'bg_color': "#ff0000"})
 
             # Cabeceras en negrita
             for col_idx, header in enumerate(df_estancia.columns):
@@ -221,8 +286,13 @@ def reporte_censo():
                     if formato:
                         ws_resumen.write(row_idx + 1, col_prom, prom, formato)
 
+            # Ajustar ancho de columnas en resumen
+            for col_idx, col_name in enumerate(df_estancia.columns):
+                max_len = max(df_estancia[col_name].astype(str).map(len).max(), len(col_name))
+                ws_resumen.set_column(col_idx, col_idx, max_len + 2)
 
-            # Colorear columna Dias Estancia
+        # Colorear columna Dias Estancia solo si df_censo no está vacío
+        if not df_censo.empty and "DIAS_ESTANCIA" in df_censo.columns:
             col_prom = df_censo.columns.get_loc("DIAS_ESTANCIA")
             for row_idx, row in df_censo.iterrows():
                 prom = row["DIAS_ESTANCIA"]
@@ -236,12 +306,6 @@ def reporte_censo():
                     if formato:
                         ws_detalle.write(row_idx + 1, col_prom, prom, formato)
 
-
-            # Ajustar ancho de columnas en resumen
-            for col_idx, col_name in enumerate(df_estancia.columns):
-                max_len = max(df_estancia[col_name].astype(str).map(len).max(), len(col_name))
-                ws_resumen.set_column(col_idx, col_idx, max_len + 2)
-
     output.seek(0)
     nombre_archivo = f"CENSO_HOSP_{servicio}_{empresa or 'TODAS'}_{fecha_actual}.xlsx"
 
@@ -253,52 +317,232 @@ def reporte_censo():
     )
 
 ####################--------------------------------------------------------------##########################
-  # grafico de Censo
+  # grafico de Censo - DINAMICO CON FILTROS
 @hospitalizacion_bp.route('/datos_censo_grafico', methods=['POST'])
 def datos_censo_grafico():
     data = request.json
     servicio = data.get('servicio')
-    empresa = data.get('empresa')
+    empresa = data.get('empresa', '')
 
     if not servicio:
         return jsonify({'error': 'Debe seleccionar una ubicación'}), 400
 
-    with engine.connect() as conn:
-        if empresa:
+    try:
+        with engine.connect() as conn:
+            # Ejecutar SP con los parámetros del filtro
+            if empresa:
+                conn.execute(
+                    text("EXECUTE PROCEDURE SP_Censod(:servicio, :empresa)"),
+                    {'servicio': servicio, 'empresa': empresa}
+                )
+            else:
+                conn.execute(
+                    text("EXECUTE PROCEDURE SP_Censod(:servicio, :empresa)"),
+                    {'servicio': servicio, 'empresa': '0'}
+                )
+
+            # WHERE dinámico según servicio
+            if servicio == 'TS':
+                where_clause = "WHERE C1.UBI <> 'TS'"
+            else:
+                where_clause = f"WHERE C1.UBI = '{servicio}'"
+
+            # Query única: resumen por UBI + conteo estancia alta
+            query_unica = f"""
+                SELECT UNIQUE
+                    CASE
+                        WHEN C1.UBI = 'H1' THEN 1
+                        WHEN C1.UBI = 'H2' THEN 2
+                        WHEN C1.UBI = 'H3' THEN 3
+                        WHEN C1.UBI = 'UA' THEN 4
+                        ELSE 6
+                    END AS ORDEN_UBI,
+                    C1.UBI,
+                    C1.OCUPADAS,
+                    C1.DISPONIBLES,
+                    C1.NO_HAB_SERV,
+                    C1.POR_OCU_SER,
+                    C1.POR_OCU_SER_TOT,
+                    C1.PROM_ESTANCIA,
+                    (
+                        SELECT COUNT(*)
+                        FROM CENSO1 C2
+                        WHERE C2.UBI = C1.UBI
+                          AND C2.DIAS_ESTANCIA > 10
+                          AND C2.ASEGURADOR IS NOT NULL
+                          AND TRIM(C2.ASEGURADOR) <> ''
+                    ) AS CNT_ALTA
+                FROM CENSO1 C1
+                {where_clause}
+                ORDER BY ORDEN_UBI
+            """
+
+            df_dato1 = pd.read_sql(query_unica, conn)
+            
+            # Calcular ocupación total de la clínica (sin filtros)
+            query_total_clinica = """
+                SELECT UNIQUE
+                    SUM(C1.OCUPADAS) AS TOTAL_OCUPADAS,
+                    SUM(C1.NO_HAB_SERV) AS TOTAL_CAMAS
+                FROM CENSO1 C1
+                WHERE C1.UBI <> 'TS'
+            """
+            df_total_clinica = pd.read_sql(query_total_clinica, conn)
+            total_ocupadas_clinica = pd.to_numeric(df_total_clinica['total_ocupadas'].iloc[0], errors='coerce') or 0
+            total_camas_clinica = pd.to_numeric(df_total_clinica['total_camas'].iloc[0], errors='coerce') or 1
+            ocupacion_clinica_total = (total_ocupadas_clinica / total_camas_clinica * 100) if total_camas_clinica > 0 else 0
+
+        # Normalizar columnas y tipos
+        df_dato1.columns = df_dato1.columns.str.lower()
+        df_dato1 = df_dato1.fillna(0)
+
+        for col in ['ocupadas', 'disponibles', 'no_hab_serv']:
+            df_dato1[col] = pd.to_numeric(df_dato1[col], errors='coerce').fillna(0).astype(int)
+
+        for col in ['por_ocu_ser', 'por_ocu_ser_tot', 'prom_estancia']:
+            df_dato1[col] = pd.to_numeric(df_dato1[col], errors='coerce').fillna(0)
+
+        df_dato1['cnt_alta'] = pd.to_numeric(df_dato1['cnt_alta'], errors='coerce').fillna(0).astype(int)
+        df_dato1['ubi'] = df_dato1['ubi'].str.strip()
+
+        datos = {
+            'labels':        df_dato1['ubi'].tolist(),
+            'ocupadas':      df_dato1['ocupadas'].tolist(),
+            'disponibles':   df_dato1['disponibles'].tolist(),
+            'porcentaje':    df_dato1['por_ocu_ser'].tolist(),
+            'porcentaje_gral': df_dato1['por_ocu_ser_tot'].tolist(),
+            'total':         df_dato1['no_hab_serv'].tolist(),
+            'estancia':      df_dato1['prom_estancia'].tolist(),
+            'estancia_alta': df_dato1['cnt_alta'].tolist(),
+            'ocupacion_clinica_total': round(ocupacion_clinica_total, 2),
+        }
+        
+        return jsonify(datos)
+    
+    except Exception as e:
+        return jsonify({'error': f'Error al obtener datos: {str(e)}'}), 500
+
+####################--------------------------------------------------------------##########################
+# Endpoint para análisis adicionales (asegurador, edad, diagnósticos)
+@hospitalizacion_bp.route('/datos_analisis_adicionales', methods=['POST'])
+def datos_analisis_adicionales():
+    data = request.json
+    servicio = data.get('servicio')
+    empresa = data.get('empresa', '')
+
+    if not servicio:
+        return jsonify({'error': 'Debe seleccionar una ubicación'}), 400
+
+    try:
+        with engine.connect() as conn:
+            # CENSO1 es una tabla temporal de sesión: cada request abre una conexión nueva
+            # por lo tanto SIEMPRE hay que ejecutar el SP en la misma conexión que hace la query.
             conn.execute(
                 text("EXECUTE PROCEDURE SP_Censod(:servicio, :empresa)"),
-                {'servicio': servicio, 'empresa': empresa}
-            )
-        else:
-            conn.execute(
-                text("EXECUTE PROCEDURE SP_Censod(:servicio)"),
-                {'servicio': servicio}
+                {'servicio': servicio, 'empresa': empresa if empresa else '0'}
             )
 
-        df_dato1 = pd.read_sql(""" SELECT DISTINCT UBI, OCUPADAS, DISPONIBLES, NO_HAB_SERV, POR_OCU_SER, PROM_ESTANCIA,
-                                    CASE 
-                                            WHEN UBI = 'H1' THEN 1
-                                            WHEN UBI = 'H2' THEN 2
-                                            WHEN UBI = 'H3' THEN 3
-                                            WHEN UBI = 'UA' THEN 4
-                                            WHEN UBI = 'TS' THEN 5
-                                            ELSE 6
-                                    END AS ORDEN_UBI
-                                FROM CENSO1
-                                ORDER BY ORDEN_UBI;"""
-         , conn)
+            # WHERE dinámico
+            if servicio == 'TS':
+                where_clause = "WHERE UBI <> 'TS'"
+            else:
+                where_clause = f"WHERE UBI = '{servicio}'"
+
+            query_analisis = f"""
+                SELECT ASEGURADOR, EDAD, DIAGNOSTICO, CIE10
+                FROM CENSO1
+                {where_clause}
+                AND ASEGURADOR IS NOT NULL
+                AND TRIM(ASEGURADOR) <> ''
+            """
+
+            df_censo = pd.read_sql(query_analisis, conn)
         
+        df_censo.columns = df_censo.columns.str.upper()
 
-    # Reordenar columnas: primero ubicaciones, luego valores, y total al final
-    datos = {
-        'labels': df_dato1['ubi'].tolist(),
-        'ocupadas': df_dato1['ocupadas'].tolist(),
-        'disponibles': df_dato1['disponibles'].tolist(),
-        'porcentaje': df_dato1['por_ocu_ser'].tolist(),
-        'total': df_dato1['no_hab_serv'].tolist(), 
-        'estancia': df_dato1['prom_estancia'].tolist(),
-    }
-    return jsonify(datos)
+        if df_censo.empty:
+            # Si no hay pacientes con asegurador, retornar datos vacíos
+            resultado = {
+                'asegurador': {'labels': [], 'valores': []},
+                'rango_edad': {
+                    'labels': ["0-17 años", "18-39 años", "40-59 años", "60+ años"],
+                    'valores': [0, 0, 0, 0]
+                }
+            }
+            return jsonify(resultado)
+        
+        df_censo = df_censo.fillna({'DIAGNOSTICO': 'SIN DIAGNÓSTICO'})
+        
+        # Convertir EDAD a numérico
+        df_censo['EDAD'] = pd.to_numeric(df_censo['EDAD'], errors='coerce').fillna(0).astype(int)
+        
+        # 1. ANÁLISIS POR ASEGURADOR
+        asegurador_counts = df_censo['ASEGURADOR'].value_counts().to_dict()
+        top_aseguradores = dict(sorted(asegurador_counts.items(), key=lambda x: x[1], reverse=True)[:10])
+        
+        # 2. ANÁLISIS POR RANGO DE EDAD
+        def categorizar_edad(edad):
+            if edad < 18:
+                return "0-17 años"
+            elif edad < 40:
+                return "18-39 años"
+            elif edad < 60:
+                return "40-59 años"
+            else:
+                return "60+ años"
+        
+        df_censo['RANGO_EDAD'] = df_censo['EDAD'].apply(categorizar_edad)
+        rango_counts = df_censo['RANGO_EDAD'].value_counts().to_dict()
+        rango_ordered = {
+            "0-17 años": rango_counts.get("0-17 años", 0),
+            "18-39 años": rango_counts.get("18-39 años", 0),
+            "40-59 años": rango_counts.get("40-59 años", 0),
+            "60+ años": rango_counts.get("60+ años", 0)
+        }
+        
+        # 3. DIAGNÓSTICOS MÁS FRECUENTES
+        diagnosticos_counts = df_censo['DIAGNOSTICO'].value_counts().head(10).to_dict()
+        
+        # 4. ANÁLISIS CRUZADO: ASEGURADOR x RANGO EDAD
+        crosstab = pd.crosstab(df_censo['ASEGURADOR'], df_censo['RANGO_EDAD'])
+        # Tomar top 5 aseguradores
+        top_5_aseg = df_censo['ASEGURADOR'].value_counts().head(5).index.tolist()
+        crosstab_filtered = crosstab.loc[top_5_aseg]
+        
+        # Convertir a formato para gráfico
+        crosstab_data = {}
+        for aseg in crosstab_filtered.index:
+            crosstab_data[aseg] = {
+                "0-17 años": int(crosstab_filtered.loc[aseg, "0-17 años"]) if "0-17 años" in crosstab_filtered.columns else 0,
+                "18-39 años": int(crosstab_filtered.loc[aseg, "18-39 años"]) if "18-39 años" in crosstab_filtered.columns else 0,
+                "40-59 años": int(crosstab_filtered.loc[aseg, "40-59 años"]) if "40-59 años" in crosstab_filtered.columns else 0,
+                "60+ años": int(crosstab_filtered.loc[aseg, "60+ años"]) if "60+ años" in crosstab_filtered.columns else 0,
+            }
+        
+        resultado = {
+            'asegurador': {
+                'labels': list(top_aseguradores.keys()),
+                'valores': list(top_aseguradores.values())
+            },
+            'rango_edad': {
+                'labels': list(rango_ordered.keys()),
+                'valores': list(rango_ordered.values())
+            },
+            'diagnosticos': {
+                'labels': list(diagnosticos_counts.keys()),
+                'valores': list(diagnosticos_counts.values())
+            },
+            'cruzado': {
+                'aseguradores': list(crosstab_data.keys()),
+                'rangos': ["0-17 años", "18-39 años", "40-59 años", "60+ años"],
+                'datos': crosstab_data
+            }
+        }
+        
+        return jsonify(resultado)
+    
+    except Exception as e:
+        return jsonify({'error': f'Error al obtener análisis: {str(e)}'}), 500
 
 ####################--------------------------------------------------------------##########################
 # ----------------------------------------- Tablero UCI (vista HTML) ------------------------------------------------------
@@ -353,9 +597,6 @@ def obtener_datos_uci():
         return jsonify(response_data)
 
     except Exception as e:
-        import traceback
-        print("❌ Error en obtener_datos_uci:")
-        traceback.print_exc()
         return jsonify({"error": f"Error al ejecutar SP_Escalas_Ucid: {str(e)}"}), 500
     
 #---------------------------------------------------------
@@ -385,7 +626,6 @@ def convertir_a_lenguaje_natural(texto):
         response = model.generate_content(prompt)
         return response.text.strip() if response and response.text else "Sin información generada"
     except Exception as e:
-        print(f"⚠️ Error al invocar Gemini: {e}")
         return "Error al procesar la información"
 
 @hospitalizacion_bp.route('/uci/riesgos-necesidades-detalle', methods=['POST'])
@@ -446,5 +686,4 @@ def obtener_riesgos_necesidades():
         })
 
     except Exception as e:
-        traceback.print_exc()
         return jsonify({"error": f"Error al obtener riesgos: {str(e)}"}), 500

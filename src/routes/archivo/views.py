@@ -508,7 +508,7 @@ def obtener_detalle_traslado(consecutivo):
                   FROM TRAENC e
                   INNER JOIN TRADET d ON d.TRADETCOD = e.TRAENCCOD
                   WHERE e.TRAENCCOD = :consecutivo
-                  ORDER BY d.TRADETHIS, d.TRADETNUM
+                  ORDER BY d.TRADETCON
                 """
             ), {'consecutivo': consecutivo})
 

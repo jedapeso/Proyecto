@@ -74,3 +74,4 @@ services:
              --without-gossip
              --without-mingle
     restart: always
+ 

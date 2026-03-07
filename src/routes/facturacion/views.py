@@ -31,7 +31,6 @@ def dashboard():
         convenios_lista = [f"{row['empnom']} | {row['empcod']}" for _, row in convenios.iterrows()]
         return render_template('facturacion/dashboard.html', convenios=convenios_lista)
     except Exception as e:
-        logging.error(f"❌ Error al cargar dashboard: {e}", exc_info=True)
         return "Error al cargar convenios", 500
 
 
@@ -79,7 +78,6 @@ def generar_excel():
                 download_name=f'Facturacion_{nombre.strip()}.xlsx'
             )
     except Exception as e:
-        logging.error(f"❌ Error al generar Excel: {e}", exc_info=True)
         return f"Error al generar Excel: {e}", 500
 
 
@@ -115,7 +113,6 @@ def generar_excel_medinsumos():
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
     except Exception as e:
-        logging.error(f"❌ Error en med_insumos: {e}", exc_info=True)
         return "Error al generar el reporte", 500
 
 
@@ -143,15 +140,12 @@ def enviar_reporte_cargos():
         # Lanzar proceso Celery
         ejecutar_reporte_cargos.delay(usuario_id, anios)
 
-        logging.info(f"🚀 Reporte de cargos iniciado: {usuario_id}")
-
         return jsonify({
             "status": "started",
             "usuario_id": usuario_id,
             "anios": anios
         })
     except Exception as e:
-        logging.error(f"❌ Error al iniciar reporte de cargos: {e}", exc_info=True)
         return jsonify({"status": "error", "msg": str(e)}), 500
 
 
@@ -181,7 +175,6 @@ def reporte_cargos_logs(usuario_id):
             "finalizado": finalizado
         })
     except Exception as e:
-        logging.error(f"❌ Error al obtener progreso: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 
@@ -215,5 +208,4 @@ def cancelar_reporte_cargos_route():
             "mensaje": "🛑 Proceso cancelado correctamente."
         }), 200
     except Exception as e:
-        logging.error(f"❌ Error al cancelar proceso: {e}", exc_info=True)
         return jsonify({"status": "error", "mensaje": str(e)}), 500

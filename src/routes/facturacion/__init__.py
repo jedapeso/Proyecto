@@ -9,7 +9,6 @@ from . import views
 # Importar tareas de Celery (para que se registren correctamente)
 try:
     from . import tasks
-    print("✅ [Facturación] Tareas de Celery registradas correctamente.")
 except Exception as e:
-    print(f"⚠️ [Facturación] No se pudieron registrar las tareas de Celery: {e}")
+    pass
 
