@@ -4,7 +4,6 @@ from sqlalchemy import text
 from datetime import datetime
 import pandas as pd
 from dotenv import load_dotenv
-import google.generativeai as genai
 import os
 import qrcode
 import io
@@ -17,15 +16,6 @@ from . import tableros_bp
 
 # Cargar variables de entorno
 load_dotenv()
-
-
-api_key = os.getenv("GOOGLE_API_KEY")
-if not api_key:
-    raise ValueError("⚠️ No se encontró GOOGLE_API_KEY en .env")
-
-
-genai.configure(api_key=api_key)
-model = genai.GenerativeModel("gemini-2.5-flash")
 
 
 fecha_actual = datetime.now().strftime('%Y-%m-%d')

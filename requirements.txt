@@ -1,15 +1,17 @@
 flask
+flask-compress
 pandas
 sqlalchemy
 ibm_db==3.2.6
 ibm_db_sa
 xlsxwriter
 reportlab
-google-generativeai
+google-genai
 python-dotenv
 celery[redis]
 redis>=5.0.0
 openpyxl
 qrcode==7.4.2
 Pillow==10.1.0
+pytest
 

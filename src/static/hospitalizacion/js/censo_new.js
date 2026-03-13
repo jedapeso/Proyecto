@@ -1,1003 +1,905 @@
-// ============================================
-// === CENSO HOSPITALARIO - DASHBOARD MODERNO ===
-// ============================================
+(() => {
+  class CensoDashboard {
+    constructor(root = document) {
+      this.root = root;
+      this.cacheTTL = 300000;
+      this.urls = {
+        companies: "/hospitalizacion/empresas_por_servicio",
+        chart: "/hospitalizacion/datos_censo_grafico",
+        analysis: "/hospitalizacion/datos_analisis_adicionales",
+        excel: "/hospitalizacion/reporte_censo",
+      };
+      this.libs = {
+        echarts: "https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js",
+        bootstrap: "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js",
+      };
+      this.names = {
+        H1: "Hospitalizacion Piso 1",
+        H2: "Hospitalizacion Piso 2",
+        H3: "Hospitalizacion Piso 3",
+        UA: "UCI",
+        TS: "General",
+      };
+      this.modalTitles = {
+        "1": "<i class='fas fa-clock'></i> Promedio de Estancia por Servicio",
+        "2": "<i class='fas fa-shield'></i> Analisis de Asegurador",
+        "3": "<i class='fas fa-birthday-cake'></i> Distribucion por Rango de Edad",
+      };
+      this.el = {
+        service: root.getElementById("servicio"),
+        company: root.getElementById("empresa"),
+        excel: root.getElementById("btnDescargarExcel"),
+        refresh: root.getElementById("btnRefrescarManual"),
+        analysis: root.getElementById("btnAnalisisAdicionales"),
+        main: root.getElementById("main-dashboard"),
+        placeholder: root.getElementById("mensaje-placeholder"),
+        body: root.getElementById("servicios-detalle"),
+        wrapper: root.querySelector(".servicios-tabla-wrapper"),
+        update: root.getElementById("texto-actualizacion"),
+        icon: root.getElementById("icono-refresh"),
+        stayCard: root.getElementById("kpi-estancia-card"),
+        modal: root.getElementById("reportsModal"),
+        modalTitle: root.getElementById("modalReportTitle"),
+        modalPlaceholder: root.getElementById("modal-placeholder"),
+        barras: root.getElementById("graficoBarras"),
+        estancia: root.getElementById("graficoEstancia"),
+        asegurador: root.getElementById("graficoAsegurador"),
+        rangoEdad: root.getElementById("graficoRangoEdad"),
+      };
+      this.state = {
+        chartInstances: new Map(),
+        filters: { servicio: "", empresa: "" },
+        cache: new Map(),
+        companies: new Map(),
+        hashes: { graph: null, analysis: null },
+        modalOpen: false,
+        modalEventsAttached: false,
+        modalInstance: null,
+        autoTimeout: null,
+        autoInterval: null,
+        controller: null,
+        chartObserver: null,
+        chartObserverTriggered: false,
+        pendingGraph: null,
+        pendingAnalysis: null,
+        virtualRows: [],
+        isVirtual: false,
+        rowHeight: 52,
+        overscan: 8,
+        resizeFrame: 0,
+        scrollFrame: 0,
+      };
+      this.bound = {
+        click: this.onClick.bind(this),
+        change: this.onChange.bind(this),
+        resize: this.debounce(() => this.resizeCharts(), 150),
+        filter: this.debounce((field) => this.onFilterChange(field), 250),
+        scroll: () => {
+          if (this.state.scrollFrame) return;
+          this.state.scrollFrame = requestAnimationFrame(() => {
+            this.state.scrollFrame = 0;
+            this.renderVirtualRows();
+          });
+        },
+        shown: async () => {
+          this.state.modalOpen = true;
+          this.setModalTab("1");
+          await this.ensureECharts(true);
+          const payload = this.state.cache.get(this.getKey())?.payload;
+          if (payload?.grafico) this.renderStayChart(payload.grafico);
+          if (payload?.analisis) this.renderAnalysis(payload.analisis);
+          await this.loadData({ includeAnalysis: true });
+          this.resizeCharts(true);
+        },
+        hidden: () => {
+          this.state.modalOpen = false;
+        },
+      };
+    }
 
-document.addEventListener("DOMContentLoaded", () => {
-  /* === REFERENCIAS A ELEMENTOS DEL DOM === */
-  const selectServicio = document.getElementById("servicio");
-  const selectEmpresa = document.getElementById("empresa");
-  const btnExcel = document.getElementById("btnDescargarExcel");
-  const btnRefrescarManual = document.getElementById("btnRefrescarManual");
-  const empresaSeleccionada = document.getElementById("empresaSeleccionada");
-  
-  const mainDashboard = document.getElementById("main-dashboard");
-  const placeholderMessage = document.getElementById("mensaje-placeholder");
-  
-  const ultimaActualizacion = document.getElementById("ultima-actualizacion");
-  const textoActualizacion = document.getElementById("texto-actualizacion");
-  const iconoRefresh = document.getElementById("icono-refresh");
-  
-  // === INSTANCIAS DE ECHARTS ===
-  let chartBarras     = null;
-  let chartEstancia   = null;
-  let chartAsegurador = null;
-  let chartRangoEdad  = null;
+    init() {
+      if (!this.el.service || !this.el.company) return;
+      this.disableCompany();
+      this.clearDashboard();
+      this.root.addEventListener("click", this.bound.click);
+      this.root.addEventListener("change", this.bound.change);
+      window.addEventListener("resize", this.bound.resize);
+      this.el.wrapper?.addEventListener("scroll", this.bound.scroll, { passive: true });
+      this.initChartObserver();
+    }
 
-  // === ESTADO GLOBAL ===
-  let modalAbierto      = false;   // solo actualizar análisis si el modal está visible
-  let analisisPendiente = false;   // marcar para actualizar cuando se abra el modal
-  let debounceTimer     = null;    // evitar fetches por clicks rápidos
+    getFilters() {
+      return { servicio: this.el.service.value || "", empresa: this.el.company.value || "" };
+    }
 
-  // === MAPA DE SERVICIO A NOMBRE ===
-  const nombresServicios = {
-    H1: "Hospitalización Piso 1",
-    H2: "Hospitalización Piso 2",
-    H3: "Hospitalización Piso 3",
-    UA: "UCI",
-    TS: "General"
-  };
+    getKey(filters = this.getFilters()) {
+      return `${filters.servicio}|${filters.empresa || "0"}`;
+    }
 
-  // Cache de todas las opciones de servicio (capturadas al iniciar)
-  let opcionesServicioCompletas = [];
+    onClick(event) {
+      const target = event.target.closest("button, .modal-tab-btn");
+      if (!target) return;
+      if (target.id === "btnAnalisisAdicionales") return void this.openModal();
+      if (target.id === "btnDescargarExcel") return void this.downloadExcel();
+      if (target.id === "btnRefrescarManual") return void this.loadData({ force: true, includeAnalysis: this.state.modalOpen });
+      if (target.matches(".modal-tab-btn")) this.setModalTab(target.dataset.modalTab || "1");
+    }
 
-  function guardarOpcionesServicio() {
-    opcionesServicioCompletas = [...selectServicio.options].map(o => ({
-      value: o.value,
-      text:  o.textContent
-    }));
-  }
+    onChange(event) {
+      if (event.target === this.el.service) return void this.bound.filter("servicio");
+      if (event.target === this.el.company) return void this.bound.filter("empresa");
+    }
 
-  function abreviarLabels(labels) {
-    return labels.map(label => {
-      return label.replace("Hospitalización", "Hosp");
-    });
-  }
-
-  const coloresPaleta = ["#3498db", "#2ecc71", "#e67e22", "#9b59b6"];
-
-  // === INICIALIZAR ECHARTS ===
-  function inicializarCharts() {
-    const containerBarras     = document.getElementById("graficoBarras");
-    const containerEstancia   = document.getElementById("graficoEstancia");
-    const containerAsegurador = document.getElementById("graficoAsegurador");
-    const containerRangoEdad  = document.getElementById("graficoRangoEdad");
-
-    if (containerBarras     && !chartBarras)     chartBarras     = echarts.init(containerBarras);
-    if (containerEstancia   && !chartEstancia)   chartEstancia   = echarts.init(containerEstancia);
-    if (containerAsegurador && !chartAsegurador) chartAsegurador = echarts.init(containerAsegurador);
-    if (containerRangoEdad  && !chartRangoEdad)  chartRangoEdad  = echarts.init(containerRangoEdad);
-
-    // Un solo listener: solo redimensiona gráficos del modal si está abierto
-    window.addEventListener("resize", () => {
-      chartBarras?.resize();
-      if (modalAbierto) {
-        chartEstancia?.resize();
-        chartAsegurador?.resize();
-        chartRangoEdad?.resize();
+    async onFilterChange(field) {
+      if (field === "servicio") {
+        const servicio = this.el.service.value;
+        if (!servicio) {
+          this.disableCompany();
+          this.clearDashboard();
+          return;
+        }
+        await this.loadCompanies(servicio);
       }
-    });
-  }
-
-  /* === PESTAÑAS Y MODAL === */
-  function inicializarPestanasModal() {
-    const reportsModalEl      = document.getElementById("reportsModal");
-    const reportsModal        = new bootstrap.Modal(reportsModalEl);
-    const btnAnalisisAdicionales = document.getElementById("btnAnalisisAdicionales");
-    const modalTabButtons     = document.querySelectorAll(".modal-tab-btn");
-    const modalTabContents    = document.querySelectorAll(".modal-tab-content");
-    const modalReportTitle    = document.getElementById("modalReportTitle");
-
-    const tabTitles = {
-      1: "<i class='fas fa-clock'></i> Promedio de Estancia por Servicio",
-      2: "<i class='fas fa-shield'></i> Análisis de Asegurador",
-      3: "<i class='fas fa-birthday-cake'></i> Distribución por Rango de Edad"
-    };
-
-    // Rastrear estado del modal con eventos nativos de Bootstrap
-    reportsModalEl.addEventListener("shown.bs.modal", () => {
-      modalAbierto = true;
-      // Asegurar que Estancia (tab 1) esté activa
-      document.querySelectorAll('.modal-tab-btn').forEach(b => b.classList.remove("active"));
-      document.querySelectorAll('.modal-tab-content').forEach(c => c.classList.remove("active"));
-      document.querySelectorAll('[data-modal-tab="1"]').forEach(el => el.classList.add("active"));
-      
-      // Siempre cargar los análisis adicionales cuando se abre el modal
-      analisisPendiente = false;
-      actualizarAnalisisAdicionales();
-      
-      // Redimensionar gráficos después de que el modal esté completamente visible
-      setTimeout(() => {
-        chartEstancia?.resize();
-        chartAsegurador?.resize();
-        chartRangoEdad?.resize();
-      }, 300);
-    });
-    reportsModalEl.addEventListener("hidden.bs.modal", () => { modalAbierto = false; });
-
-    // Botón Análisis Adicionales abre el modal con Estancia visible por defecto
-    if (btnAnalisisAdicionales) {
-      btnAnalisisAdicionales.addEventListener("click", () => {
-        // Limpiar todas las pestañas activas
-        modalTabButtons.forEach(b => b.classList.remove("active"));
-        modalTabContents.forEach(c => c.classList.remove("active"));
-        
-        // Activar pestaña 1 (Estancia)
-        document.querySelectorAll('[data-modal-tab="1"]').forEach(el => el.classList.add("active"));
-        
-        // Actualizar título
-        if (modalReportTitle) modalReportTitle.innerHTML = "<i class='fas fa-clock'></i> Promedio de Estancia por Servicio";
-        reportsModal.show();
-      });
+      if (!this.el.service.value) return;
+      this.state.filters = this.getFilters();
+      this.startAutoRefresh();
     }
 
-    // Pestañas dentro del modal
-    modalTabButtons.forEach(btn => {
-      btn.addEventListener("click", () => {
-        const tabId = parseInt(btn.dataset.modalTab);
-        modalTabButtons.forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        modalTabContents.forEach(c => c.classList.toggle("active", parseInt(c.dataset.modalTab) === tabId));
-        if (modalReportTitle) modalReportTitle.innerHTML = tabTitles[tabId] || "";
-        setTimeout(() => {
-          chartEstancia?.resize();
-          chartAsegurador?.resize();
-          chartRangoEdad?.resize();
-        }, 200);
-      });
-    });
-  }
-
-  /* === HELPERS EMPRESA === */
-  function deshabilitarEmpresa() {
-    selectEmpresa.value     = "";
-    selectEmpresa.innerHTML = '<option value="">-- Seleccione servicio primero --</option>';
-    selectEmpresa.disabled  = true;
-    selectEmpresa.style.opacity = "0.5";
-    selectEmpresa.style.cursor  = "not-allowed";
-    if (empresaSeleccionada) empresaSeleccionada.textContent = "";
-  }
-
-  function habilitarEmpresa() {
-    selectEmpresa.disabled      = false;
-    selectEmpresa.style.opacity = "1";
-    selectEmpresa.style.cursor  = "pointer";
-  }
-
-  /* === DEBOUNCE === */
-  function withDebounce(fn, delay = 300) {
-    return (...args) => {
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => fn(...args), delay);
-    };
-  }
-
-  /* === CARGAR EMPRESAS SEGÚN SERVICIO === */
-  async function cargarEmpresas(servicio) {
-    if (!servicio) { deshabilitarEmpresa(); return; }
-
-    try {
-      const response = await fetch("/hospitalizacion/empresas_por_servicio", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ serv: servicio }),
-      });
-      if (!response.ok) throw new Error("Error cargando empresas");
-
-      const empresas = await response.json();
-      selectEmpresa.innerHTML = '<option value="">Todas las empresas</option>';
-      empresas.forEach((e) => {
-        const option = document.createElement("option");
-        option.value   = e.id;
-        option.textContent = e.nombre;
-        selectEmpresa.appendChild(option);
-      });
-      habilitarEmpresa();
-      selectEmpresa.value = "";  // Resetear a "Todas"
-      if (empresaSeleccionada) empresaSeleccionada.textContent = "";
-    } catch (err) {
-      console.error("Error cargando empresas:", err);
-      deshabilitarEmpresa();
-    }
-  }
-
-  /* === EVENTOS DE LOS SELECTS (con debounce) === */
-  selectServicio.addEventListener("change", withDebounce(async () => {
-    const servicio = selectServicio.value;
-
-    if (!servicio) {
-      deshabilitarEmpresa();
-      limpiarDashboard();
-      return;
-    }
-
-    placeholderMessage.style.display = "none";
-    await cargarEmpresas(servicio);
-    startAutomaticUpdates();
-  }));
-
-  selectEmpresa.addEventListener("change", withDebounce(async () => {
-    if (selectEmpresa.disabled) return;
-
-    const empresa = selectEmpresa.value;
-    const nombre  = selectEmpresa.options[selectEmpresa.selectedIndex]?.text || "";
-    if (empresaSeleccionada) {
-      empresaSeleccionada.textContent = (empresa && !nombre.includes("Todas")) ? nombre : "";
-    }
-
-    // Solo actualizar dashboard con el nuevo filtro de empresa
-    if (selectServicio.value) startAutomaticUpdates();
-  }));
-
-  /* === LIMPIAR DASHBOARD === */
-  function limpiarDashboard() {
-    mainDashboard.style.display      = "none";
-    placeholderMessage.style.display = "block";
-    chartBarras?.clear();
-    chartEstancia?.clear();
-    chartAsegurador?.clear();
-    chartRangoEdad?.clear();
-    ultimoHash = null;
-    setLastUpdateEmpty();
-    stopAutomaticUpdates();
-  }
-
-  /* === ACTUALIZAR KPIs DINÁMICOS === */
-  function actualizarKPIs(data) {
-    const ocupadas    = (data.ocupadas    || []).map(v => parseFloat(v) || 0);
-    const disponibles = (data.disponibles || []).map(v => parseFloat(v) || 0);
-    const totales     = (data.total       || []).map(v => parseFloat(v) || 0);
-    const estancia    = (data.estancia    || []).map(v => parseFloat(v) || 0);
-    const porcentajeGral = (data.porcentaje_gral || []).map(v => parseFloat(v) || 0);
-
-    const totalOcupadas    = ocupadas.reduce((a, b) => a + b, 0);
-    const totalDisponibles = disponibles.reduce((a, b) => a + b, 0);
-    const totalCamas       = totales.reduce((a, b) => a + b, 0);
-    
-    // Sumar todos los porcentajes generales (POR_OCU_SER_TOT) de los servicios visibles
-    const sumaPorcentajeGral = porcentajeGral.reduce((a, b) => a + b, 0).toFixed(2);
-
-    const estanciaValida   = estancia.filter(e => e > 0);
-    const estanciaPromedio = estanciaValida.length > 0
-      ? (estanciaValida.reduce((a, b) => a + b, 0) / estanciaValida.length).toFixed(1)
-      : 0;
-
-    const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-    set("kpi-ocupadas",    totalOcupadas);
-    set("kpi-disponibles", totalDisponibles);
-    set("kpi-ocupacion",   sumaPorcentajeGral + "%");
-    set("kpi-estancia",    estanciaPromedio + " días");    
-    // Aplicar clase de color al KPI de estancia según el promedio
-    const estanciaNumFloat = parseFloat(estanciaPromedio);
-    const kpiEstanciaCard = document.getElementById("kpi-estancia-card");
-    if (kpiEstanciaCard) {
-      kpiEstanciaCard.classList.remove("estancia-low", "estancia-medium", "estancia-high");
-      if (estanciaNumFloat > 10) {
-        kpiEstanciaCard.classList.add("estancia-high");
-      } else if (estanciaNumFloat >= 7) {
-        kpiEstanciaCard.classList.add("estancia-medium");
-      } else {
-        kpiEstanciaCard.classList.add("estancia-low");
-      }
-    }
-  }
-
-  /* === GENERAR TABLA DETALLE DE SERVICIOS === */
-  function generarTarjetasServicios(data) {
-    const container = document.getElementById("servicios-detalle");
-    if (!container) return;
-
-    const { labels = [], ocupadas = [], disponibles = [], total = [], porcentaje = [], porcentaje_gral = [], estancia = [] } = data;
-
-    container.innerHTML = labels.map((label, idx) => {
-      const nombreServicio = nombresServicios[label] || label;
-      const ocupadasVal      = ocupadas[idx]    || 0;
-      const disponiblesVal   = disponibles[idx] || 0;
-      const totalVal         = total[idx]       || 0;
-      const porcentajeVal    = (porcentaje[idx] || 0).toFixed(2);
-      const porcentajeGral   = (porcentaje_gral[idx] || 0).toFixed(2);
-      const estanciaVal      = (estancia[idx]   || 0).toFixed(1);
-      const porcentajeNum    = parseFloat(porcentajeVal);
-      const estanciaNum      = parseFloat(estanciaVal);
-      
-      // Determinar clase de severidad según ocupación para la barra
-      let ocupancyClass = "low";
-      if (porcentajeNum >= 95) ocupancyClass = "high";
-      else if (porcentajeNum >= 80) ocupancyClass = "medium";
-      
-      // Determinar clase de severidad según estancia
-      let estanciaClass = "low";
-      if (estanciaNum > 10) estanciaClass = "high";
-      else if (estanciaNum >= 7) estanciaClass = "medium";
-
-      return `
-        <tr>
-          <td>${nombreServicio}</td>
-          <td class="text-center">${ocupadasVal}</td>
-          <td class="text-center">${disponiblesVal}</td>
-          <td class="text-center">${totalVal}</td>
-          <td class="text-center">
-            <div class="servicio-occupancy">
-              <div class="servicio-occupancy-bar">
-                <div class="servicio-occupancy-fill ${ocupancyClass}" style="width: ${Math.max(porcentajeNum, 3)}%">
-                  ${porcentajeNum > 20 ? porcentajeVal + '%' : ''}
-                </div>
-              </div>
-              ${porcentajeNum <= 20 ? `<span class="servicio-occupancy-label">${porcentajeVal}%</span>` : ''}
-            </div>
-          </td>
-          <td class="text-center">${porcentajeGral}%</td>
-          <td class="text-center"><span class="estancia-badge estancia-${estanciaClass}">${estanciaVal}</span></td>
-        </tr>`;
-    }).join("");
-  }
-
-  /* === GRÁFICO PIE DE ASEGURADOR === */
-  function renderizarGraficoAsegurador(analisisData) {
-    if (!analisisData.asegurador || !analisisData.asegurador.labels) {
-      chartAsegurador?.setOption({
-        series: [{ type: "pie", data: [{ value: 0, name: "Sin datos" }] }]
-      });
-      return;
-    }
-
-    const labels = analisisData.asegurador.labels;
-    const valores = analisisData.asegurador.valores;
-    const isSmallScreen = window.innerWidth < 768;
-    
-    const seriesData = labels.map((label, i) => ({
-      value: valores[i],
-      name: label
-    }));
-
-    const option = {
-      tooltip: { trigger: "item", formatter: "{b}: {c} ({d}%)" },
-      legend: {
-        orient: isSmallScreen ? "vertical" : "horizontal",
-        left: isSmallScreen ? "right" : "center",
-        right: isSmallScreen ? "8px" : "auto",
-        bottom: isSmallScreen ? "auto" : 10,
-        top: isSmallScreen ? "15%" : "auto",
-        textStyle: { fontSize: isSmallScreen ? 9 : 11, fontWeight: 500 },
-        type: isSmallScreen ? "scroll" : "plain",
-        maxHeight: isSmallScreen ? "250px" : "auto",
-        pageIconColor: "#3498db",
-        pageTextStyle: { color: "#666" },
-        formatter: (name) => {
-          const index = labels.indexOf(name);
-          const maxLength = isSmallScreen ? 12 : 30;
-          return `${index + 1}. ${name.substring(0, maxLength)}${name.length > maxLength ? '...' : ''}`;
-        },
-        itemWidth: 8,
-        itemHeight: 8,
-        itemGap: isSmallScreen ? 2 : 15,
-        padding: isSmallScreen ? [2, 4] : [5, 10]
-      },
-      grid: { 
-        top: 30, 
-        bottom: 30, 
-        left: 30, 
-        right: isSmallScreen ? 100 : 30 
-      },
-      series: [{
-        type: "pie",
-        data: seriesData,
-        center: ["45%", "35%"],
-        radius: isSmallScreen ? ["15%", "48%"] : ["20%", "60%"],
-        emphasis: { itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: "rgba(0, 0, 0, 0.5)" } },
-        label: { show: false }
-      }]
-    };
-    chartAsegurador?.setOption(option, true);
-  }
-
-  /* === GRÁFICO BAR DE RANGO DE EDAD === */
-  function renderizarGraficoRangoEdad(analisisData) {
-    if (!analisisData.rango_edad || !analisisData.rango_edad.labels) {
-      chartRangoEdad?.setOption({ series: [{ type: "line", data: [] }] });
-      return;
-    }
-
-    const labels = analisisData.rango_edad.labels;
-    const valores = analisisData.rango_edad.valores;
-    const totalPacientes = valores.reduce((a, b) => a + b, 0) || 1;
-    const porcentajes = valores.map(v => parseFloat(((v / totalPacientes) * 100).toFixed(2)));
-
-    const option = {
-      tooltip: {
-        trigger: "axis",
-        axisPointer: { type: "cross" },
-        backgroundColor: "rgba(255,255,255,0.95)",
-        borderColor: "#e0e0e0",
-        borderWidth: 1,
-        textStyle: { color: "#333", fontSize: 13 },
-        formatter: (params) => {
-          if (!params.length) return "";
-          const i = params[0].dataIndex;
-          let html = `<div style="font-weight:bold;margin-bottom:4px">${labels[i]}</div>`;
-          params.forEach(param => {
-            if (param.seriesType === "line") {
-              html += `<div style="display:flex;align-items:center;gap:6px">
-                <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#3498db"></span>
-                <span>${valores[i]} pacientes</span>
-              </div>`;
-            } else if (param.seriesType === "bar") {
-              html += `<div style="display:flex;align-items:center;gap:6px">
-                <span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#e67e22"></span>
-                <span>${porcentajes[i]}% del total</span>
-              </div>`;
-            }
-          });
-          return html;
-        }
-      },
-      grid: { left: "8%", right: "8%", bottom: "18%", top: "12%", containLabel: true },
-      xAxis: {
-        type: "category",
-        data: labels,
-        axisLabel: {
-          fontSize: 12,
-          color: "#555",
-          fontWeight: "500",
-          interval: 0
-        },
-        axisLine: { lineStyle: { color: "#ddd" } },
-        axisTick: { show: true, lineStyle: { color: "#ddd" } }
-      },
-      yAxis: [
-        {
-          type: "value",
-          name: "Pacientes",
-          nameTextStyle: { color: "#3498db", fontSize: 11, fontWeight: 600 },
-          position: "left",
-          axisLabel: { formatter: (v) => v, fontSize: 11, color: "#3498db" },
-          splitLine: { lineStyle: { color: "#f0f0f0", type: "dashed" } },
-          axisLine: { show: true, lineStyle: { color: "#3498db" } },
-          axisTick: { show: false }
-        },
-        {
-          type: "value",
-          name: "Porcentaje (%)",
-          nameTextStyle: { color: "#e67e22", fontSize: 11, fontWeight: 600 },
-          position: "right",
-          axisLabel: { formatter: (v) => v + "%", fontSize: 11, color: "#e67e22" },
-          splitLine: { show: false },
-          axisLine: { show: true, lineStyle: { color: "#e67e22" } },
-          axisTick: { show: false }
-        }
-      ],
-      series: [
-        {
-          type: "line",
-          name: "Pacientes",
-          data: valores,
-          yAxisIndex: 0,
-          smooth: 0.4,
-          symbol: "circle",
-          symbolSize: 8,
-          itemStyle: { color: "#3498db", borderColor: "#fff", borderWidth: 2 },
-          lineStyle: { color: "#3498db", width: 3 },
-          areaStyle: { color: "rgba(52, 152, 219, 0.08)" },
-          label: {
-            show: true,
-            position: "left",
-            formatter: (params) => {
-              return valores[params.dataIndex];
-            },
-            fontSize: 11,
-            fontWeight: "bold",
-            color: "#fff",
-            backgroundColor: "#3498db",
-            padding: [2, 6],
-            borderRadius: 4,
-            offset: [-35, 0]
-          },
-          z: 0,
-          silent: true
-        },
-        {
-          type: "bar",
-          name: "Porcentaje",
-          data: porcentajes,
-          yAxisIndex: 1,
-          itemStyle: { 
-            color: "#e67e22",
-            opacity: 0.8,
-            borderRadius: [4, 4, 0, 0]
-          },
-          barWidth: "40%",
-          label: {
-            show: true,
-            position: "top",
-            formatter: (params) => {
-              return porcentajes[params.dataIndex] + "%";
-            },
-            fontSize: 12,
-            fontWeight: "700",
-            color: "#e67e22",
-            backgroundColor: "rgba(255, 255, 255, 0.8)",
-            padding: [2, 6],
-            borderRadius: 3,
-            offset: [0, -30]
-          },
-          z: 10
-        }
-      ]
-    };
-    chartRangoEdad?.setOption(option, true);
-  }
-
-  /* === ANÁLISIS ADICIONALES (solo se ejecuta cuando el modal está abierto) === */
-  async function actualizarAnalisisAdicionales() {
-    const servicio = selectServicio.value;
-    const empresa  = selectEmpresa.value;
-    const placeholder = document.getElementById("modal-placeholder");
-    
-    if (!servicio) {
-      // Mostrar placeholder si no hay servicio seleccionado
-      if (placeholder) placeholder.classList.add("show");
-      return;
-    }
-
-    try {
-      const response = await fetch("/hospitalizacion/datos_analisis_adicionales", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ servicio, empresa })
-      });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const analisisData = await response.json();
-      
-      // Ocultar placeholder cuando hay datos
-      if (placeholder) placeholder.classList.remove("show");
-      
-      renderizarGraficoAsegurador(analisisData);
-      renderizarGraficoRangoEdad(analisisData);
-      // Aumentar delay para asegurar que el DOM esté listo
-      setTimeout(() => { 
-        chartEstancia?.resize(); 
-        chartAsegurador?.resize(); 
-        chartRangoEdad?.resize(); 
-      }, 200);
-    } catch (err) {
-      console.error("Error análisis adicionales:", err);
-      // Mostrar placeholder en caso de error
-      if (placeholder) placeholder.classList.add("show");
-    }
-  }
-
-  /* === GRÁFICO COMBINADO DE DISPONIBILIDAD (BARRAS + LÍNEA) === */
-  function renderizarGraficoDisponibilidad(data, labelsConvertidas, porcentaje) {
-    const ocupadas = (data.ocupadas || []).map(v => Math.max(0, parseFloat(v) || 0));
-    const disponibles = (data.disponibles || []).map(v => Math.max(0, parseFloat(v) || 0));
-    const total = (data.total || []).map(v => Math.max(0, parseFloat(v) || 0));
-    const porcentajeNumerico = (porcentaje || []).map(v => Math.max(0, Math.min(100, parseFloat(v) || 0)));
-
-    // Calcular máximo de camas para escalar el eje izquierdo
-    // De forma que 100% corresponda al máximo de camas visualmente
-    const maxCamas = Math.max(...total, 1);
-
-    // Colores planos que coinciden con las tarjetas KPI
-    const colorOcupadas    = "#3498db";  // Azul   → tarjeta Camas Ocupadas
-    const colorDisponibles = "#2ecc71";  // Verde  → tarjeta Camas Disponibles
-    const colorTotal       = "#9b59b6";  // Morado → tarjeta Estancia / Total
-    const colorLinea       = "#e67e22";  // Naranja → % Ocupación
-
-    const option = {
-      tooltip: {
-        trigger: "axis",
-        axisPointer: { type: "shadow" },
-        backgroundColor: "rgba(255,255,255,0.95)",
-        borderColor: "#e0e0e0",
-        borderWidth: 1,
-        textStyle: { color: "#333", fontSize: 13 },
-        formatter: (params) => {
-          let result = `<div style="font-weight:bold;margin-bottom:6px">${params[0].name}</div>`;
-          params.forEach(p => {
-            const dot = `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${p.color};margin-right:6px"></span>`;
-            if (p.seriesType === "bar") {
-              result += `<div style="display:flex;align-items:center">${dot}${p.seriesName}: <b style="margin-left:4px">${Math.round(p.value)}</b></div>`;
-            } else {
-              result += `<div style="display:flex;align-items:center"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${colorLinea};margin-right:6px"></span>${p.seriesName}: <b style="margin-left:4px">${p.value.toFixed(2)}%</b></div>`;
-            }
-          });
-          return result;
-        }
-      },
-      legend: {
-        top: 5,
-        left: "center",
-        itemWidth: 12,
-        itemHeight: 12,
-        textStyle: { fontSize: 12, color: "#555" }
-      },
-      grid: { left: "3%", right: "3%", bottom: "5%", top: "60px", containLabel: true },
-      xAxis: {
-        type: "category",
-        data: labelsConvertidas,
-        axisLabel: { rotate: 0, fontSize: 12, color: "#555", fontWeight: "bold" },
-        axisLine: { lineStyle: { color: "#ddd" } },
-        axisTick: { show: false },
-        splitArea: { show: true, areaStyle: { color: ["rgba(250,250,250,0.6)", "rgba(255,255,255,0)"] } }
-      },
-      yAxis: [
-        {
-          type: "value",
-          name: "Camas",
-          nameTextStyle: { padding: [0, 0, 0, 40], color: "#3498db", fontSize: 11 },
-          axisLabel: { fontSize: 11, color: "#3498db", interval: 0 },
-          splitLine: { lineStyle: { color: "#f0f0f0", type: "dashed" } },
-          axisLine: { show: false },
-          axisTick: { show: false },
-          min: 0,
-          max: 30,
-          splitNumber: 6
-        },
-        {
-          type: "value",
-          name: "% Ocupación",
-          nameTextStyle: { padding: [0, 0, 0, 0], color: colorLinea, fontSize: 11 },
-          position: "right",
-          axisLabel: { 
-            fontSize: 11, 
-            color: colorLinea,
-            interval: 0,
-            formatter: (value) => value.toFixed(0) + "%"
-          },
-          splitLine: { show: false },
-          axisLine: { show: false },
-          axisTick: { show: false },
-          min: 0,
-          max: 100,
-          splitNumber: 10
-        }
-      ],
-      series: [
-        {
-          name: "Ocupadas",
-          type: "bar",
-          data: ocupadas,
-          itemStyle: {
-            color: colorOcupadas,
-            borderRadius: [6, 6, 0, 0]
-          },
-          label: { show: true, position: "top", color: "#333", fontSize: 11, fontWeight: "bold", formatter: "{c}" }
-        },
-        {
-          name: "Disponibles",
-          type: "bar",
-          data: disponibles,
-          itemStyle: {
-            color: colorDisponibles,
-            borderRadius: [6, 6, 0, 0]
-          },
-          label: { show: true, position: "top", color: "#333", fontSize: 11, fontWeight: "bold", formatter: "{c}" }
-        },
-        {
-          name: "Total",
-          type: "bar",
-          data: total,
-          itemStyle: {
-            color: colorTotal,
-            borderRadius: [6, 6, 0, 0]
-          },
-          label: { show: true, position: "top", color: "#333", fontSize: 11, fontWeight: "bold", formatter: "{c}" }
-        },
-        {
-          name: "% Ocupación",
-          type: "line",
-          yAxisIndex: 1,
-          data: porcentajeNumerico,
-          itemStyle: { color: colorLinea },
-          lineStyle: { width: 3, color: colorLinea },
-          symbol: "circle",
-          symbolSize: 9,
-          barOffset: "-66%",
-          label: {
-            show: true,
-            position: "top",
-            formatter: "{c}%",
-            color: colorLinea,
-            fontSize: 11,
-            fontWeight: "bold"
-          }
-        }
-      ]
-    };
-    chartBarras?.setOption(option, true);
-  }
-
-  /* === GRÁFICO DE ESTANCIA MEJORADO === */
-  function renderizarGraficoEstancia(data, labelsConvertidas) {
-    const estancia = (data.estancia || []).map(e => parseFloat(e) || 0);
-    const ocupadas = (data.ocupadas || []).map(v => parseFloat(v) || 0);
-    
-    // Validar que labelsConvertidas no esté vacío
-    let labels = labelsConvertidas && labelsConvertidas.length > 0 ? labelsConvertidas : data.labels || [];
-    
-    // Usar conteo REAL del backend (pacientes individuales con DIAS_ESTANCIA > 10)
-    // NO derivar del promedio: un servicio con promedio 8 puede tener 2 pacientes con 15 días
-    const estanciaAlta = (data.estancia_alta || []).map(v => parseInt(v) || 0);
-
-    const option = {
-      tooltip: { 
-        trigger: "axis", 
-        axisPointer: { type: "cross" },
-        formatter: (params) => {
-          let result = params[0].name + "<br/>";
-          params.forEach(p => {
-            if (p.seriesType === 'line') {
-              result += p.seriesName + ": " + p.value.toFixed(2) + " días<br/>";
-            } else {
-              result += p.seriesName + ": " + Math.round(p.value) + " pacientes<br/>";
-            }
-          });
-          return result;
-        }
-      },
-      legend: { top: 5, left: "center" },
-      grid: { left: "3%", right: "3%", bottom: "5%", top: "60px", containLabel: true },
-      xAxis: {
-        type: "category",
-        data: labels,
-        axisLabel: { rotate: 0, fontSize: 12, interval: 0, showMaxLabel: true }
-      },
-      yAxis: [
-        {
-          type: "value",
-          name: "Promedio de Días",
-          nameTextStyle: { padding: [0, 0, 0, 40], color: "#9b59b6" },
-          axisLabel: { 
-            formatter: (value) => Math.round(value) + " días",
-            fontSize: 11,
-            color: "#9b59b6"
-          },
-          splitLine: { lineStyle: { color: "rgba(0,0,0,0.05)" } }
-        },
-        {
-          type: "value",
-          name: "Pacientes con Estancia Alta",
-          nameTextStyle: { padding: [0, 0, 0, 0], color: "#e67e22" },
-          position: "right",
-          axisLabel: { 
-            formatter: (value) => Math.round(value),
-            fontSize: 11,
-            color: "#e67e22"
-          },
-          splitLine: { show: false }
-        }
-      ],
-      series: [
-        {
-          name: "Promedio Estancia",
-          type: "line",
-          data: estancia,
-          smooth: true,
-          yAxisIndex: 0,
-          itemStyle: { color: "#9b59b6" },
-          areaStyle: { color: "rgba(155, 89, 182, 0.3)" },
-          symbol: "circle",
-          symbolSize: 10,
-          lineStyle: { width: 3 },
-          label: {
-            show: true,
-            position: "top",
-            formatter: "{c}",
-            fontSize: 12,
-            color: "#9b59b6",
-            fontWeight: "bold"
-          }
-        },
-        {
-          name: "Pacientes con Estancia > 10 días",
-          type: "bar",
-          data: estanciaAlta,
-          yAxisIndex: 1,
-          barWidth: "25%",
-          itemStyle: { color: "rgba(230, 126, 34, 0.6)" },
-          label: {
-            show: true,
-            position: "top",
-            formatter: "{c}",
-            fontSize: 10,
-            color: "#e67e22"
-          }
-        }
-      ]
-    };
-    chartEstancia?.setOption(option, true);
-  }
-
-  /* === HASH Y ESTADO DE ACTUALIZACIÓN === */
-  let ultimoHash      = null;
-  let currentController = null;
-
-  function generarHash(data) {
-    return JSON.stringify({ l: data.labels, o: data.ocupadas, d: data.disponibles, t: data.total, p: data.porcentaje, e: data.estancia });
-  }
-
-  async function actualizarDashboard(force = false) {
-    const servicio = selectServicio.value;
-    const empresa = selectEmpresa.value;
-
-    if (!servicio) return;
-
-    if (currentController) {
+    async loadCompanies(servicio) {
+      const cached = this.state.companies.get(servicio);
+      if (cached) return void this.renderCompanies(cached);
       try {
-        currentController.abort();
-      } catch {}
+        const companies = await this.fetchJsonWithRetry(this.urls.companies, { serv: servicio }, { retries: 2, timeout: 15000 });
+        this.state.companies.set(servicio, companies);
+        this.renderCompanies(companies);
+      } catch (error) {
+        console.error("Error cargando empresas:", error);
+        this.disableCompany();
+      }
     }
 
-    currentController = new AbortController();
-    const timeoutId = setTimeout(() => currentController.abort(), 30000); // Timeout de 30 segundos
-
-    try {
-      const response = await fetch("/hospitalizacion/datos_censo_grafico", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ servicio, empresa }),
-        signal: currentController.signal
+    renderCompanies(companies) {
+      const fragment = document.createDocumentFragment();
+      const first = document.createElement("option");
+      first.value = "";
+      first.textContent = "Todas las empresas";
+      fragment.appendChild(first);
+      companies.forEach((company) => {
+        const option = document.createElement("option");
+        option.value = company.id;
+        option.textContent = company.nombre;
+        fragment.appendChild(option);
       });
+      this.el.company.replaceChildren(fragment);
+      this.el.company.value = "";
+      this.el.company.disabled = false;
+      this.el.company.style.opacity = "1";
+      this.el.company.style.cursor = "pointer";
+    }
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      const data = await response.json();
+    disableCompany() {
+      const option = document.createElement("option");
+      option.value = "";
+      option.textContent = "-- Seleccione servicio primero --";
+      this.el.company.replaceChildren(option);
+      this.el.company.value = "";
+      this.el.company.disabled = true;
+      this.el.company.style.opacity = "0.5";
+      this.el.company.style.cursor = "not-allowed";
+    }
 
-      const hash = generarHash(data);
-      if (!force && hash === ultimoHash) return;
+    startAutoRefresh() {
+      this.stopAutoRefresh();
+      this.loadData({ includeAnalysis: this.state.modalOpen });
+      const now = new Date();
+      const wait = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
+      this.state.autoTimeout = setTimeout(() => {
+        this.loadData({ includeAnalysis: this.state.modalOpen });
+        this.state.autoInterval = setInterval(() => this.loadData({ includeAnalysis: this.state.modalOpen }), 60000);
+      }, wait);
+    }
 
-      ultimoHash = hash;
+    stopAutoRefresh() {
+      if (this.state.autoTimeout) clearTimeout(this.state.autoTimeout);
+      if (this.state.autoInterval) clearInterval(this.state.autoInterval);
+      this.state.autoTimeout = null;
+      this.state.autoInterval = null;
+    }
 
-      // Convertir labels a nombres legibles
-      const labelsConvertidas = (data.labels || []).map(l => nombresServicios[l] || l);
-      const labelsAbreviados = abreviarLabels(labelsConvertidas);
-      const porcentajeNumeros = (data.porcentaje || []).map(Number);
-
-      // Actualizar UI
-      mainDashboard.style.display = "block";
-      placeholderMessage.style.display = "none";
-
-      actualizarKPIs(data);
-      renderizarGraficoDisponibilidad(data, labelsAbreviados, porcentajeNumeros);
-      generarTarjetasServicios(data);
-      renderizarGraficoEstancia(data, labelsAbreviados);
-
-      // Análisis adicionales solo si el modal está abierto; si no, marcar pendiente
-      if (modalAbierto) {
-        actualizarAnalisisAdicionales();
-      } else {
-        analisisPendiente = true;
+    async loadData({ force = false, includeAnalysis = false } = {}) {
+      const filters = this.getFilters();
+      if (!filters.servicio) return null;
+      const key = this.getKey(filters);
+      const entry = this.state.cache.get(key);
+      const fresh = entry && Date.now() - entry.updatedAt < this.cacheTTL;
+      if (!force && entry?.payload?.grafico) {
+        this.updateUI(entry.payload, { includeAnalysis });
+        if (!fresh || (includeAnalysis && !entry.payload.analisis)) this.revalidate(key, filters, includeAnalysis);
+        return entry.payload;
       }
-
-      setTimeout(() => { chartBarras?.resize(); chartEstancia?.resize(); }, 100);
-      setLastUpdateToNow();
-    } catch (error) {
-      if (error.name !== "AbortError") console.error("Error actualizando dashboard:", error);
-    } finally {
-      clearTimeout(timeoutId);
+      return this.revalidate(key, filters, includeAnalysis, force);
     }
-  }
 
-  /* === ÚLTIMA ACTUALIZACIÓN === */
-  function formatFecha12Horas(date = new Date()) {
-    const diasSemana = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
-    const meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-    
-    let horas = date.getHours();
-    const minutos = date.getMinutes().toString().padStart(2, "0");
-    const ampm = horas >= 12 ? "pm" : "am";
-    horas = horas % 12 || 12;
-    
-    return `${diasSemana[date.getDay()]}, ${date.getDate()} ${meses[date.getMonth()]} ${horas}:${minutos} ${ampm}`;
-  }
-
-  function setLastUpdateEmpty() {
-    if (textoActualizacion) textoActualizacion.textContent = "Última actualización: --";
-  }
-
-  function setLastUpdateToNow() {
-    if (textoActualizacion) textoActualizacion.textContent = `Última actualización: ${formatFecha12Horas()}`;
-  }
-
-  function showRefreshIcon() {
-    if (iconoRefresh) {
-      iconoRefresh.classList.add("fa-spin");
-      iconoRefresh.style.display = "inline-block";
+    async revalidate(key, filters, includeAnalysis, force = false) {
+      const entry = this.state.cache.get(key) || {};
+      if (entry.promise) return entry.promise;
+      if (this.state.controller) this.state.controller.abort();
+      this.showRefresh();
+      const controller = new AbortController();
+      this.state.controller = controller;
+      const promise = this.fetchDashboardData(filters, includeAnalysis, controller.signal)
+        .then((payload) => {
+          const merged = {
+            grafico: payload.grafico || entry.payload?.grafico || null,
+            analisis: payload.analisis || entry.payload?.analisis || null,
+          };
+          this.state.cache.set(key, { payload: merged, updatedAt: Date.now(), promise: null });
+          this.updateUI(merged, { includeAnalysis, force });
+          return merged;
+        })
+        .catch((error) => {
+          if (error.name !== "AbortError") console.error("Error actualizando dashboard:", error);
+          return entry.payload || null;
+        })
+        .finally(() => {
+          this.hideRefresh();
+          const current = this.state.cache.get(key);
+          if (current) {
+            current.promise = null;
+            this.state.cache.set(key, current);
+          }
+          if (this.state.controller === controller) this.state.controller = null;
+        });
+      this.state.cache.set(key, { payload: entry.payload || null, updatedAt: entry.updatedAt || 0, promise });
+      return promise;
     }
-  }
 
-  function hideRefreshIcon() {
-    setTimeout(() => {
-      if (iconoRefresh) {
-        iconoRefresh.classList.remove("fa-spin");
-        iconoRefresh.style.display = "none";
+    async fetchDashboardData(filters, includeAnalysis, signal) {
+      const payload = { servicio: filters.servicio, empresa: filters.empresa };
+      const requests = [
+        this.fetchJsonWithRetry(this.urls.chart, payload, { retries: 2, signal, timeout: 30000 }),
+        includeAnalysis ? this.fetchJsonWithRetry(this.urls.analysis, payload, { retries: 2, signal, timeout: 30000 }) : Promise.resolve(null),
+      ];
+      const [grafico, analisis] = await Promise.all(requests);
+      return { grafico, analisis };
+    }
+
+    async fetchJsonWithRetry(url, payload, { retries = 2, signal, timeout = 20000 } = {}) {
+      for (let attempt = 0; attempt <= retries; attempt += 1) {
+        try {
+          return await this.fetchJson(url, payload, signal, timeout);
+        } catch (error) {
+          if (error.name === "AbortError" || attempt === retries) throw error;
+          await this.delay(300 * (2 ** attempt));
+        }
       }
-    }, 300);
-  }
-
-  async function performUpdateWithIcon(force = false) {
-    if (!selectServicio.value) {
-      setLastUpdateEmpty();
-      return;
+      throw new Error("No se pudo completar la solicitud");
     }
 
-    showRefreshIcon();
-    setLastUpdateToNow();
-
-    try {
-      await actualizarDashboard(force);
-    } finally {
-      hideRefreshIcon();
+    async fetchJson(url, payload, outerSignal, timeout) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+      const abort = () => controller.abort();
+      outerSignal?.addEventListener("abort", abort, { once: true });
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      } finally {
+        clearTimeout(timeoutId);
+        outerSignal?.removeEventListener("abort", abort);
+      }
     }
-  }
 
-  /* === ACTUALIZACIÓN AUTOMÁTICA === */
-  let minuteTimeoutId = null;
-  let minuteIntervalId = null;
+    updateUI(payload, { includeAnalysis = false, force = false } = {}) {
+      if (!payload?.grafico) return;
+      this.el.main.style.display = "block";
+      this.el.placeholder.style.display = "none";
+      const graphHash = JSON.stringify(payload.grafico);
+      const analysisHash = payload.analisis ? JSON.stringify(payload.analisis) : null;
+      if (force || graphHash !== this.state.hashes.graph) {
+        this.updateKPIs(payload.grafico);
+        this.renderTable(payload.grafico);
+        this.renderMainChart(payload.grafico);
+        if (this.state.modalOpen) this.renderStayChart(payload.grafico);
+        else this.state.pendingGraph = payload.grafico;
+        this.state.hashes.graph = graphHash;
+      }
+      if (includeAnalysis && payload.analisis && (force || analysisHash !== this.state.hashes.analysis)) {
+        this.renderAnalysis(payload.analisis);
+        this.state.hashes.analysis = analysisHash;
+      }
+      this.setLastUpdate();
+    }
 
-  function startAutomaticUpdates() {
-    stopAutomaticUpdates();
-    performUpdateWithIcon(false);
+    updateKPIs(data) {
+      const ocupadas = (data.ocupadas || []).map(Number).reduce((a, b) => a + (b || 0), 0);
+      const disponibles = (data.disponibles || []).map(Number).reduce((a, b) => a + (b || 0), 0);
+      const porcentajes = (data.porcentaje_gral || []).map(Number);
+      const estancia = (data.estancia || []).map(Number).filter((value) => value > 0);
+      const promedio = estancia.length ? (estancia.reduce((a, b) => a + b, 0) / estancia.length).toFixed(1) : "0.0";
+      this.setText("kpi-ocupadas", ocupadas);
+      this.setText("kpi-disponibles", disponibles);
+      this.setText("kpi-ocupacion", `${porcentajes.reduce((a, b) => a + (b || 0), 0).toFixed(2)}%`);
+      this.setText("kpi-estancia", `${promedio} dias`);
+      this.el.stayCard?.classList.remove("estancia-low", "estancia-medium", "estancia-high");
+      this.el.stayCard?.classList.add(Number(promedio) > 10 ? "estancia-high" : Number(promedio) >= 7 ? "estancia-medium" : "estancia-low");
+    }
 
-    const now = new Date();
-    const msUntilNextMinute = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
-
-    minuteTimeoutId = setTimeout(() => {
-      performUpdateWithIcon(false);
-      minuteIntervalId = setInterval(() => {
-        performUpdateWithIcon(false);
-      }, 60000);
-    }, msUntilNextMinute);
-  }
-
-  function stopAutomaticUpdates() {
-    if (minuteTimeoutId) clearTimeout(minuteTimeoutId);
-    if (minuteIntervalId) clearInterval(minuteIntervalId);
-  }
-
-  /* === DESCARGAR EXCEL === */
-  if (btnExcel) {
-    btnExcel.addEventListener("click", () => {
-      const servicio = selectServicio.value;
-      const empresa = selectEmpresa.value;
-
-      if (!servicio) {
-        alert("Debe seleccionar un servicio");
+    renderTable(data) {
+      const rows = (data.labels || []).map((label, index) => ({
+        servicio: this.names[label] || label,
+        ocupadas: Number(data.ocupadas?.[index]) || 0,
+        disponibles: Number(data.disponibles?.[index]) || 0,
+        total: Number(data.total?.[index]) || 0,
+        porcentaje: Number(data.porcentaje?.[index]) || 0,
+        porcentajeGeneral: Number(data.porcentaje_gral?.[index]) || 0,
+        estancia: Number(data.estancia?.[index]) || 0,
+      }));
+      this.state.virtualRows = rows;
+      this.state.isVirtual = rows.length > 100;
+      this.el.wrapper?.classList.toggle("is-virtualized", this.state.isVirtual);
+      if (!this.state.isVirtual) {
+        const fragment = document.createDocumentFragment();
+        rows.forEach((row) => fragment.appendChild(this.makeRow(row)));
+        this.el.body.replaceChildren(fragment);
         return;
       }
+      if (this.el.wrapper) this.el.wrapper.scrollTop = 0;
+      this.renderVirtualRows();
+    }
 
-      const formData = new FormData();
-      formData.append("servicio", servicio);
-      formData.append("empresa", empresa);
+    renderVirtualRows() {
+      if (!this.state.isVirtual || !this.el.wrapper || !this.el.body) return;
+      const rows = this.state.virtualRows;
+      const visible = Math.ceil((this.el.wrapper.clientHeight || 500) / this.state.rowHeight) + this.state.overscan * 2;
+      const start = Math.max(0, Math.floor(this.el.wrapper.scrollTop / this.state.rowHeight) - this.state.overscan);
+      const end = Math.min(rows.length, start + visible);
+      const fragment = document.createDocumentFragment();
+      const top = start * this.state.rowHeight;
+      const bottom = Math.max(0, (rows.length - end) * this.state.rowHeight);
+      if (top) fragment.appendChild(this.makeSpacer(top));
+      rows.slice(start, end).forEach((row) => fragment.appendChild(this.makeRow(row)));
+      if (bottom) fragment.appendChild(this.makeSpacer(bottom));
+      this.el.body.replaceChildren(fragment);
+    }
 
-      fetch("/hospitalizacion/reporte_censo", {
-        method: "POST",
-        body: formData
-      })
-        .then(res => res.blob())
-        .then(blob => {
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = `Censo_${servicio}_${new Date().toISOString().split("T")[0]}.xlsx`;
-          document.body.appendChild(a);
-          a.click();
-          window.URL.revokeObjectURL(url);
-          document.body.removeChild(a);
-        })
-        .catch(err => console.error("Error descargando Excel:", err));
-    });
+    makeSpacer(height) {
+      const tr = document.createElement("tr");
+      tr.className = "table-spacer";
+      const td = document.createElement("td");
+      td.colSpan = 7;
+      td.style.height = `${height}px`;
+      tr.appendChild(td);
+      return tr;
+    }
+
+    makeRow(row) {
+      const tr = document.createElement("tr");
+      const add = (value, className = "") => {
+        const td = document.createElement("td");
+        if (className) td.className = className;
+        td.textContent = String(value);
+        tr.appendChild(td);
+      };
+      add(row.servicio);
+      add(row.ocupadas, "text-center");
+      add(row.disponibles, "text-center");
+      add(row.total, "text-center");
+      tr.appendChild(this.makeOccupancy(row.porcentaje));
+      add(`${row.porcentajeGeneral.toFixed(2)}%`, "text-center");
+      tr.appendChild(this.makeStay(row.estancia));
+      return tr;
+    }
+
+    makeOccupancy(value) {
+      const td = document.createElement("td");
+      td.className = "text-center";
+      const wrap = document.createElement("div");
+      wrap.className = "servicio-occupancy";
+      const bar = document.createElement("div");
+      bar.className = "servicio-occupancy-bar";
+      const fill = document.createElement("div");
+      fill.className = `servicio-occupancy-fill ${value >= 95 ? "high" : value >= 80 ? "medium" : "low"}`;
+      fill.style.width = `${Math.max(value, 3)}%`;
+      if (value > 20) fill.textContent = `${value.toFixed(2)}%`;
+      bar.appendChild(fill);
+      wrap.appendChild(bar);
+      if (value <= 20) {
+        const label = document.createElement("span");
+        label.className = "servicio-occupancy-label";
+        label.textContent = `${value.toFixed(2)}%`;
+        wrap.appendChild(label);
+      }
+      td.appendChild(wrap);
+      return td;
+    }
+
+    makeStay(value) {
+      const td = document.createElement("td");
+      td.className = "text-center";
+      const badge = document.createElement("span");
+      badge.className = `estancia-badge ${value > 10 ? "estancia-high" : value >= 7 ? "estancia-medium" : "estancia-low"}`;
+      badge.textContent = value.toFixed(1);
+      td.appendChild(badge);
+      return td;
+    }
+
+    initChartObserver() {
+      if (!("IntersectionObserver" in window) || !this.el.barras) return;
+      this.state.chartObserver = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting || this.state.chartObserverTriggered) return;
+          this.state.chartObserverTriggered = true;
+          this.ensureECharts(false).then(() => this.state.pendingGraph && this.renderMainChart(this.state.pendingGraph));
+        });
+      });
+      this.state.chartObserver.observe(this.el.barras);
+    }
+
+    async openModal() {
+      if (!this.el.service.value) return void alert("Debe seleccionar un servicio");
+      await this.ensureBootstrap();
+      if (!this.state.modalEventsAttached) {
+        this.el.modal.addEventListener("shown.bs.modal", this.bound.shown);
+        this.el.modal.addEventListener("hidden.bs.modal", this.bound.hidden);
+        this.state.modalEventsAttached = true;
+      }
+      this.state.modalInstance = window.bootstrap.Modal.getOrCreateInstance(this.el.modal);
+      this.setModalTab("1");
+      this.state.modalInstance.show();
+    }
+
+    setModalTab(tab) {
+      this.root.querySelectorAll(".modal-tab-btn").forEach((button) => button.classList.toggle("active", button.dataset.modalTab === tab));
+      this.root.querySelectorAll(".modal-tab-content").forEach((content) => content.classList.toggle("active", content.dataset.modalTab === tab));
+      if (this.el.modalTitle) this.el.modalTitle.innerHTML = this.modalTitles[tab] || this.modalTitles["1"];
+      this.resizeCharts(true);
+    }
+
+    renderMainChart(data) {
+      if (!window.echarts) {
+        this.state.pendingGraph = data;
+        if (!this.state.chartObserverTriggered && !this.state.modalOpen) return;
+        return void this.ensureECharts(false).then(() => this.renderMainChart(data));
+      }
+      const chart = this.getChart("barras", this.el.barras);
+      if (!chart) return;
+      this.state.pendingGraph = null;
+      const labels = (data.labels || []).map((label) => (this.names[label] || label).replace("Hospitalizacion", "Hosp"));
+      const colors = {
+        ocupadas: "#3498db",
+        disponibles: "#2ecc71",
+        total: "#9b59b6",
+        ocupacion: "#e67e22",
+        text: "#08337b",
+      };
+      chart.setOption({
+        tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+        legend: { top: 8, left: "center", textStyle: { color: "#3d4852" } },
+        grid: { left: "5%", right: "6%", top: 90, bottom: 28, containLabel: true },
+        xAxis: {
+          type: "category",
+          data: labels,
+          axisTick: { alignWithLabel: true },
+          axisLine: { lineStyle: { color: "#9fb3c8" } },
+          axisLabel: {
+            color: colors.text,
+            fontWeight: 700,
+            margin: 10,
+          },
+        },
+        yAxis: [
+          {
+            type: "value",
+            name: "Camas",
+            nameTextStyle: { color: colors.text, fontWeight: 700 },
+            axisLabel: { color: "#5b6775" },
+            splitLine: { lineStyle: { color: "rgba(131, 150, 173, 0.25)" } },
+          },
+          {
+            type: "value",
+            name: "% Ocupacion",
+            position: "right",
+            min: 0,
+            max: 100,
+            nameTextStyle: { color: colors.ocupacion, fontWeight: 700 },
+            axisLabel: { color: colors.ocupacion },
+            splitLine: { show: false },
+          },
+        ],
+        series: [
+          {
+            name: "Ocupadas",
+            type: "bar",
+            data: (data.ocupadas || []).map(Number),
+            itemStyle: { color: colors.ocupadas, borderRadius: [6, 6, 0, 0] },
+            label: { show: true, position: "top", distance: 8, color: colors.ocupadas, fontWeight: 700 },
+          },
+          {
+            name: "Disponibles",
+            type: "bar",
+            data: (data.disponibles || []).map(Number),
+            itemStyle: { color: colors.disponibles, borderRadius: [6, 6, 0, 0] },
+            label: {
+              show: true,
+              position: "top",
+              distance: 10,
+              color: colors.disponibles,
+              fontWeight: 700,
+              backgroundColor: "rgba(255,255,255,0.95)",
+              padding: [2, 6],
+              borderRadius: 10,
+            },
+          },
+          {
+            name: "Total",
+            type: "bar",
+            data: (data.total || []).map(Number),
+            itemStyle: { color: colors.total, borderRadius: [6, 6, 0, 0] },
+            label: { show: true, position: "top", distance: 8, color: colors.total, fontWeight: 700 },
+          },
+          {
+            name: "% Ocupacion",
+            type: "line",
+            yAxisIndex: 1,
+            z: 5,
+            data: (data.porcentaje || []).map((value) => Math.max(0, Math.min(100, Number(value) || 0))),
+            itemStyle: { color: colors.ocupacion },
+            lineStyle: { color: colors.ocupacion, width: 3 },
+            symbolSize: 7,
+            label: {
+              show: true,
+              position: "top",
+              distance: 10,
+              color: colors.ocupacion,
+              fontWeight: 700,
+              backgroundColor: "rgba(255,255,255,0.96)",
+              borderColor: "rgba(230,126,34,0.25)",
+              borderWidth: 1,
+              padding: [3, 6],
+              borderRadius: 10,
+              formatter: ({ value }) => `${Number(value).toFixed(1)}%`,
+            },
+            labelLayout: { moveOverlap: "shiftY" },
+          },
+        ],
+      }, true);
+      this.resizeCharts(false);
+    }
+
+    renderStayChart(data) {
+      if (!window.echarts || !data) return;
+      const chart = this.getChart("estancia", this.el.estancia);
+      if (!chart) return;
+      const labels = (data.labels || []).map((label) => (this.names[label] || label).replace("Hospitalizacion", "Hosp"));
+      chart.setOption({
+        tooltip: { trigger: "axis", axisPointer: { type: "cross" } },
+        legend: { top: 8, left: "center" },
+        grid: { left: "4%", right: "4%", top: 60, bottom: 20, containLabel: true },
+        xAxis: { type: "category", data: labels, axisLabel: { interval: 0 } },
+        yAxis: [{ type: "value", name: "Promedio de dias" }, { type: "value", name: "Pacientes > 10", position: "right", splitLine: { show: false } }],
+        series: [
+          { name: "Promedio Estancia", type: "line", data: (data.estancia || []).map(Number), smooth: true, itemStyle: { color: "#9b59b6" }, areaStyle: { color: "rgba(155,89,182,.18)" }, label: { show: true, position: "top" } },
+          { name: "Pacientes con estancia alta", type: "bar", yAxisIndex: 1, data: (data.estancia_alta || []).map(Number), itemStyle: { color: "rgba(230,126,34,.65)" }, label: { show: true, position: "top" } },
+        ],
+      }, true);
+    }
+
+    renderAnalysis(data) {
+      this.state.pendingAnalysis = data;
+      if (!this.state.modalOpen || !window.echarts) return;
+      this.el.modalPlaceholder?.classList.remove("show");
+      this.renderStayChart(this.state.pendingGraph || this.state.cache.get(this.getKey())?.payload?.grafico);
+      const asegurador = this.getChart("asegurador", this.el.asegurador);
+      const rango = this.getChart("rangoEdad", this.el.rangoEdad);
+      if (asegurador) {
+        const labels = data.asegurador?.labels || [];
+        const valores = data.asegurador?.valores || [];
+        asegurador.setOption({
+          tooltip: {
+            trigger: "item",
+            backgroundColor: "rgba(0, 0, 0, 0.75)",
+            borderColor: "rgba(255, 255, 255, 0.2)",
+            textStyle: { color: "#fff", fontSize: 11 },
+            formatter: (params) => `${params.name}: ${params.value} (${params.percent}%)`,
+          },
+          grid: { left: 0, right: 0, top: 0, bottom: 0, containLabel: false },
+          legend: {
+            type: "plain",
+            orient: "horizontal",
+            bottom: 5,
+            left: 0,
+            right: 0,
+            width: "100%",
+            itemWidth: 16,
+            itemHeight: 12,
+            itemGap: 16,
+            data: labels,
+            textStyle: {
+              fontSize: 9,
+              overflow: "truncate",
+              width: 140,
+              ellipsis: "...",
+              padding: [0, 0, 0, 4],
+            },
+            icon: "circle",
+            pageIconColor: "#999",
+            pageTextStyle: { color: "#999" },
+          },
+          series: [{
+            type: "pie",
+            radius: ["22%", "55%"],
+            center: ["50%", "40%"],
+            label: { show: false },
+            labelLine: { show: false },
+            emphasis: {
+              itemStyle: { borderColor: "#fff", borderWidth: 2 },
+              label: { show: false },
+            },
+            data: labels.length ? labels.map((label, index) => ({ name: label, value: Number(valores[index]) || 0 })) : [{ name: "Sin datos", value: 0 }],
+          }],
+        }, true);
+      }
+      if (rango) {
+        const labels = data.rango_edad?.labels || [];
+        const valores = (data.rango_edad?.valores || []).map(Number);
+        const total = valores.reduce((a, b) => a + (b || 0), 0) || 1;
+        const porcentajes = valores.map((v) => Number(((v / total) * 100).toFixed(2)));
+        const maxVal = Math.max(...valores, 1);
+        const maxPct = Math.max(...porcentajes, 1);
+        rango.setOption({
+          tooltip: {
+            trigger: "axis",
+            axisPointer: { type: "shadow" },
+            formatter: (params) => params.map((p) =>
+              `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${p.color};margin-right:6px;"></span>${p.seriesName}: <b>${p.value}${p.seriesIndex === 1 ? "%" : ""}</b>`
+            ).join("<br/>"),
+          },
+          legend: {
+            top: 4,
+            right: 8,
+            itemWidth: 12,
+            itemHeight: 12,
+            textStyle: { fontSize: 11 },
+          },
+          grid: { left: "6%", right: "7%", top: 52, bottom: 28, containLabel: true },
+          xAxis: {
+            type: "category",
+            data: labels,
+            axisTick: { alignWithLabel: true },
+            axisLabel: { interval: 0, fontSize: 11, fontWeight: 600, color: "#08337b" },
+          },
+          yAxis: [
+            {
+              type: "value",
+              name: "Pacientes",
+              nameTextStyle: { color: "#3498db", fontWeight: 700, fontSize: 11 },
+              max: 100,
+              axisLabel: { color: "#3498db", fontSize: 10 },
+              splitLine: { lineStyle: { color: "rgba(131,150,173,0.2)" } },
+            },
+            {
+              type: "value",
+              name: "Porcentaje",
+              position: "right",
+              max: 100,
+              nameTextStyle: { color: "#e67e22", fontWeight: 700, fontSize: 11 },
+              axisLabel: { color: "#e67e22", fontSize: 10, formatter: "{value}%" },
+              splitLine: { show: false },
+            },
+          ],
+          series: [
+            {
+              name: "Pacientes",
+              type: "bar",
+              yAxisIndex: 0,
+              data: valores,
+              barMaxWidth: 52,
+              itemStyle: { color: "#3498db", borderRadius: [4, 4, 0, 0] },
+              label: {
+                show: true,
+                position: "insideTop",
+                distance: 6,
+                color: "#fff",
+                fontWeight: 700,
+                fontSize: 12,
+              },
+            },
+            {
+              name: "Porcentaje",
+              type: "line",
+              yAxisIndex: 1,
+              data: porcentajes,
+              smooth: 0.3,
+              z: 5,
+              symbolSize: 8,
+              itemStyle: { color: "#e67e22" },
+              lineStyle: { color: "#e67e22", width: 2.5 },
+              label: {
+                show: true,
+                position: "top",
+                distance: 8,
+                color: "#c0392b",
+                fontWeight: 700,
+                fontSize: 11,
+                backgroundColor: "rgba(255,255,255,0.92)",
+                borderColor: "rgba(230,126,34,0.4)",
+                borderWidth: 1,
+                padding: [2, 5],
+                borderRadius: 4,
+                formatter: ({ value }) => `${value}%`,
+              },
+            },
+          ],
+        }, true);
+      }
+      this.state.pendingAnalysis = null;
+      this.resizeCharts(true);
+    }
+
+    getChart(key, element) {
+      if (!window.echarts || !element) return null;
+      if (!this.state.chartInstances.has(key)) this.state.chartInstances.set(key, window.echarts.init(element));
+      return this.state.chartInstances.get(key);
+    }
+
+    resizeCharts(modalOnly = false) {
+      if (this.state.resizeFrame) cancelAnimationFrame(this.state.resizeFrame);
+      this.state.resizeFrame = requestAnimationFrame(() => {
+        this.state.resizeFrame = 0;
+        this.state.chartInstances.forEach((chart, key) => {
+          if (modalOnly && key === "barras") return;
+          chart.resize();
+        });
+      });
+    }
+
+    async ensureBootstrap() {
+      if (window.bootstrap?.Modal) return;
+      await this.loadScript(this.libs.bootstrap, "bootstrap");
+    }
+
+    async ensureECharts(modalOnly) {
+      if (window.echarts) return;
+      await this.loadScript(this.libs.echarts, "echarts");
+      if (!modalOnly && this.state.pendingGraph) this.renderMainChart(this.state.pendingGraph);
+      if (this.state.modalOpen) {
+        const payload = this.state.cache.get(this.getKey())?.payload;
+        if (payload?.grafico) this.renderStayChart(payload.grafico);
+        if (payload?.analisis) this.renderAnalysis(payload.analisis);
+      }
+    }
+
+    loadScript(src, key) {
+      const stateKey = `${key}Promise`;
+      if (this.state[stateKey]) return this.state[stateKey];
+      this.state[stateKey] = new Promise((resolve, reject) => {
+        const existing = this.root.querySelector(`script[data-dynamic-script="${key}"]`);
+        if (existing) {
+          existing.addEventListener("load", resolve, { once: true });
+          existing.addEventListener("error", reject, { once: true });
+          return;
+        }
+        const script = document.createElement("script");
+        script.src = src;
+        script.async = true;
+        script.dataset.dynamicScript = key;
+        script.addEventListener("load", resolve, { once: true });
+        script.addEventListener("error", () => reject(new Error(`No se pudo cargar ${key}`)), { once: true });
+        document.body.appendChild(script);
+      });
+      return this.state[stateKey];
+    }
+
+    async downloadExcel() {
+      const filters = this.getFilters();
+      if (!filters.servicio) return void alert("Debe seleccionar un servicio");
+      const form = new FormData();
+      form.append("servicio", filters.servicio);
+      form.append("empresa", filters.empresa);
+      try {
+        const response = await fetch(this.urls.excel, { method: "POST", body: form });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `Censo_${filters.servicio}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        console.error("Error descargando Excel:", error);
+      }
+    }
+
+    clearDashboard() {
+      this.stopAutoRefresh();
+      this.el.main.style.display = "none";
+      this.el.placeholder.style.display = "block";
+      this.el.body?.replaceChildren();
+      this.state.hashes.graph = null;
+      this.state.hashes.analysis = null;
+      this.state.pendingGraph = null;
+      this.state.pendingAnalysis = null;
+      this.setText("kpi-ocupadas", 0);
+      this.setText("kpi-disponibles", 0);
+      this.setText("kpi-ocupacion", "0%");
+      this.setText("kpi-estancia", "0 dias");
+      if (this.el.update) this.el.update.textContent = "Ultima actualizacion: --";
+      this.state.chartInstances.forEach((chart) => chart.clear());
+    }
+
+    setText(id, value) {
+      const element = this.root.getElementById(id);
+      if (element) element.textContent = String(value);
+    }
+
+    setLastUpdate() {
+      if (!this.el.update) return;
+      const date = new Date();
+      const weekdays = ["Domingo", "Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado"];
+      const months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+      let hours = date.getHours();
+      const minutes = String(date.getMinutes()).padStart(2, "0");
+      const suffix = hours >= 12 ? "pm" : "am";
+      hours = hours % 12 || 12;
+      this.el.update.textContent = `Ultima actualizacion: ${weekdays[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]} ${hours}:${minutes} ${suffix}`;
+    }
+
+    showRefresh() {
+      if (!this.el.icon) return;
+      this.el.icon.classList.add("fa-spin");
+      this.el.icon.style.display = "inline-block";
+    }
+
+    hideRefresh() {
+      if (!this.el.icon) return;
+      setTimeout(() => {
+        this.el.icon.classList.remove("fa-spin");
+        this.el.icon.style.display = "none";
+      }, 250);
+    }
+
+    delay(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    debounce(callback, delay) {
+      let timer = null;
+      return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => callback(...args), delay);
+      };
+    }
+
+    dispose() {
+      this.stopAutoRefresh();
+      this.state.controller?.abort();
+      this.state.chartObserver?.disconnect();
+      this.el.wrapper?.removeEventListener("scroll", this.bound.scroll);
+      if (this.state.modalEventsAttached) {
+        this.el.modal.removeEventListener("shown.bs.modal", this.bound.shown);
+        this.el.modal.removeEventListener("hidden.bs.modal", this.bound.hidden);
+      }
+      this.root.removeEventListener("click", this.bound.click);
+      this.root.removeEventListener("change", this.bound.change);
+      window.removeEventListener("resize", this.bound.resize);
+      this.state.chartInstances.forEach((chart) => chart.dispose());
+      this.state.chartInstances.clear();
+    }
   }
 
-  /* === BOTÓN REFRESCAR MANUAL === */
-  if (btnRefrescarManual) {
-    btnRefrescarManual.addEventListener("click", () => {
-      performUpdateWithIcon(true);
-    });
-  }
-
-  /* === INICIALIZACIÓN === */
-  inicializarCharts();
-  inicializarPestanasModal();
-  guardarOpcionesServicio();
-  deshabilitarEmpresa();   // empresa bloqueada hasta que se seleccione un servicio
-  limpiarDashboard();
-});
+  document.addEventListener("DOMContentLoaded", () => {
+    const dashboard = new CensoDashboard(document);
+    dashboard.init();
+    window.addEventListener("beforeunload", () => dashboard.dispose(), { once: true });
+  });
+})();

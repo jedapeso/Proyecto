@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   informix:
     image: ibmcom/informix-developer-database:latest
@@ -47,6 +45,7 @@ services:
       - SECRET_KEY=${SECRET_KEY}
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - APP_VALIDATION_MODE=${APP_VALIDATION_MODE:-0}
     volumes:
       - .:/app
     command: python run.py
@@ -61,6 +60,7 @@ services:
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - APP_VALIDATION_MODE=${APP_VALIDATION_MODE:-0}
     volumes:
       - .:/app
     # Fijar prefetch multiplier a 1 para reducir que un worker acapare muchas tareas largas
@@ -74,4 +74,16 @@ services:
              --without-gossip
              --without-mingle
     restart: always
+
+  validator:
+    build: .
+    container_name: flask_validator
+    environment:
+      - APP_VALIDATION_MODE=1
+      - SECRET_KEY=validation-secret
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    volumes:
+      - .:/app
+    command: pytest -q
  

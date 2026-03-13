@@ -7,20 +7,32 @@ import os
 import hashlib
 import traceback
 from dotenv import load_dotenv
-import google.generativeai as genai
-from google.api_core import exceptions as google_exceptions
+from google import genai
 from src.extensions import redis_client
 from . import tableros_bp
 
 # Cargar variables
 load_dotenv()
 api_key = os.getenv("GOOGLE_API_KEY")
+gemini_model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+_gemini_client = None
 
-if api_key:
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-2.5-flash")
-else:
-    model = None
+
+def get_gemini_client():
+    global _gemini_client
+
+    if _gemini_client is not None:
+        return _gemini_client
+
+    if not api_key:
+        return None
+
+    try:
+        _gemini_client = genai.Client(api_key=api_key)
+    except Exception:
+        _gemini_client = None
+
+    return _gemini_client
 
 @tableros_bp.route('/urgencias', methods=['GET'])
 def tablero_urg():
@@ -135,7 +147,6 @@ def obtener_datos_urg():
     except Exception as e:
         return jsonify({"error": f"Error servidor: {str(e)}"}), 500
 
-# --------------------------------------------
 # 🔹 Conversión a lenguaje natural (IA) con caché inteligente
 def convertir_a_lenguaje_natural_urg(texto):
     """
@@ -145,19 +156,8 @@ def convertir_a_lenguaje_natural_urg(texto):
     if not texto or texto.strip().lower() in ["none", "null", ""]:
         return "Sin información disponible"
 
-    if not api_key:
-        return "La función de resumen IA no está disponible (API Key no configurada)."
-
-# 🔹 Conversión a lenguaje natural (IA) con caché inteligente
-def convertir_a_lenguaje_natural_urg(texto):
-    """
-    Versión IA para Urgencias con caché basado en contenido.
-    Si los riesgos cambian, el hash cambia y se genera nuevo análisis.
-    """
-    if not texto or texto.strip().lower() in ["none", "null", ""]:
-        return "Sin información disponible"
-
-    if not api_key:
+    client = get_gemini_client()
+    if client is None:
         return "La función de resumen IA no está disponible (API Key no configurada)."
 
     # Normalizar texto: quitar espacios extras, saltos de línea múltiples
@@ -199,7 +199,10 @@ def convertir_a_lenguaje_natural_urg(texto):
     prompt = prompt_base.replace("{texto}", texto.strip())
 
     try:
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model=gemini_model_name,
+            contents=prompt,
+        )
         resultado = response.text.strip() if response and response.text else "Sin información generada"
         
         # Guardar en caché por 8 horas (28800 segundos)
@@ -209,8 +212,6 @@ def convertir_a_lenguaje_natural_urg(texto):
             pass
             
         return resultado
-    except google_exceptions.ResourceExhausted:
-        return "⚠️ Se ha excedido la cuota diaria de la API de Gemini (20 solicitudes/día en plan gratuito). Por favor, intente nuevamente mañana o actualice su plan en Google AI Studio."
     except Exception as e:
         traceback.print_exc()
         return f"Error al procesar la información con IA: {str(e)}"

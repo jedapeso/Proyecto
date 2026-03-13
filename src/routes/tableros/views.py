@@ -7,7 +7,7 @@ import pandas as pd
 import io
 from flask import request, jsonify
 from dotenv import load_dotenv
-import google.generativeai as genai
+from google import genai
 import os
 import xml.etree.ElementTree as ET
 import json
@@ -22,20 +22,31 @@ load_dotenv()
 
 # 🔹 Obtiene la API_KEY
 api_key = os.getenv("GOOGLE_API_KEY")
-
-if not api_key:
-    raise ValueError("⚠️ No se encontró GOOGLE_API_KEY en .env")
-
-# 🔹 Configura Gemini
-genai.configure(api_key=api_key)
-
-model = genai.GenerativeModel("gemini-2.5-flash")
+gemini_model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+_gemini_client = None
 
 ##--------------------------------------------
 
 fecha_actual = datetime.now().strftime('%Y-%m-%d')
 from flask import render_template
 from . import tableros_bp
+
+
+def get_gemini_client():
+    global _gemini_client
+
+    if _gemini_client is not None:
+        return _gemini_client
+
+    if not api_key:
+        return None
+
+    try:
+        _gemini_client = genai.Client(api_key=api_key)
+    except Exception:
+        _gemini_client = None
+
+    return _gemini_client
 
 @tableros_bp.route('/')
 def dashboard():
@@ -114,7 +125,8 @@ def convertir_a_lenguaje_natural(texto):
     if not texto or texto.strip().lower() in ["none", "null", ""]:
         return "Sin información disponible"
 
-    if not api_key:
+    client = get_gemini_client()
+    if client is None:
         return "La función de resumen IA no está disponible (API Key no configurada)."
 
     # ✅ Ruta absoluta al archivo del prompt
@@ -130,8 +142,10 @@ def convertir_a_lenguaje_natural(texto):
     prompt = prompt_base.replace("{texto}", texto.strip())
 
     try:
-        # 🔹 Llamada al modelo (puede ser Gemini, GPT u otro)
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model=gemini_model_name,
+            contents=prompt,
+        )
         return response.text.strip() if response and response.text else "Sin información generada"
     except Exception as e:
         return "Error al procesar la información (verifique el log del servidor para más detalles)."

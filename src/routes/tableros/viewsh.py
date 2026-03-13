@@ -5,7 +5,7 @@ from datetime import datetime
 import pandas as pd
 import io
 from dotenv import load_dotenv
-import google.generativeai as genai
+from google import genai
 import os
 import traceback
 import unicodedata
@@ -17,15 +17,28 @@ from . import tableros_bp
 load_dotenv()
 
 api_key = os.getenv("GOOGLE_API_KEY")
-if not api_key:
-    raise ValueError("⚠️ No se encontró GOOGLE_API_KEY en .env")
-
-# 🔹 Configura el modelo Gemini
-genai.configure(api_key=api_key)
-model = genai.GenerativeModel("gemini-2.5-flash")
+gemini_model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+_gemini_client = None
 
 # --------------------------------------------
 fecha_actual = datetime.now().strftime('%Y-%m-%d')
+
+
+def get_gemini_client():
+    global _gemini_client
+
+    if _gemini_client is not None:
+        return _gemini_client
+
+    if not api_key:
+        return None
+
+    try:
+        _gemini_client = genai.Client(api_key=api_key)
+    except Exception:
+        _gemini_client = None
+
+    return _gemini_client
 
 # --------------------------------------------
 # 🔹 Vista principal del tablero de HOSPITALIZACIÓN
@@ -95,7 +108,8 @@ def convertir_a_lenguaje_natural_hos(texto):
     if not texto or texto.strip().lower() in ["none", "null", ""]:
         return "Sin información disponible"
 
-    if not api_key:
+    client = get_gemini_client()
+    if client is None:
         return "La función de resumen IA no está disponible (API Key no configurada)."
 
     ruta_prompt = os.path.join("config", "prompts", "tablero_hos_v1.txt")
@@ -112,7 +126,10 @@ def convertir_a_lenguaje_natural_hos(texto):
     prompt = prompt_base.replace("{texto}", texto.strip())
 
     try:
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model=gemini_model_name,
+            contents=prompt,
+        )
         return response.text.strip() if response and response.text else "Sin información generada"
     except Exception as e:
         return "Error al procesar la información (verifique el log del servidor)."
